@@ -6,7 +6,7 @@ import WebMIDI from 'webmidi';
 import globals from './globals';
 import parameterMetadata from './parameterMetadata';
 import { InitialTextureTypes, drawFirstFrame } from './firstFrame';
-import { simulationUniforms, displayUniforms } from './uniforms';
+import { simulationUniforms } from './uniforms';
 import { refreshUI } from './ui';
 import parameterValues from './parameterValues';
 
@@ -97,25 +97,6 @@ function setupLPD8(lpd8) {
         break;
 
       // Bottom row = 5-8 ----------------------------------------------------------------------------------------
-      case 5:
-        displayUniforms.hslFrom.value.x = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.from.min = displayUniforms.hslFrom.value.x;
-        break;
-
-      case 6:
-        displayUniforms.hslFrom.value.y = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.from.max = displayUniforms.hslFrom.value.y;
-        break;
-
-      case 7:
-        displayUniforms.hslTo.value.x = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.to.min = displayUniforms.hslTo.value.x;
-        break;
-
-      case 8:
-        displayUniforms.hslTo.value.y = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.to.max = displayUniforms.hslTo.value.y;
-        break;
     }
 
     refreshUI();
@@ -223,35 +204,6 @@ function setupLaunchControlXL(launchControlXL) {
 
 
       // Bottom row (49-56) - color mapping -------------------------------------------
-      case 49:  // chemical range (low)
-        displayUniforms.hslFrom.value.x = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.from.min = displayUniforms.hslFrom.value.x;
-        break;
-
-      case 50:  // chemical range (high)
-        displayUniforms.hslFrom.value.y = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.from.max = displayUniforms.hslFrom.value.y;
-        break;
-
-      case 51:  // h range (low)
-        displayUniforms.hslTo.value.x = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.to.min = displayUniforms.hslTo.value.x;
-        break;
-
-      case 52:  // h range (high)
-        displayUniforms.hslTo.value.y = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.to.max = displayUniforms.hslTo.value.y;
-        break;
-
-      case 53:  // saturation
-        displayUniforms.hslSaturation.value = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.saturation = displayUniforms.hslSaturation.value
-        break;
-
-      case 54:  // luminosity
-        displayUniforms.hslLuminosity.value = e.value.map(0, 127, 0.0, 1.0);
-        parameterValues.hsl.luminosity = displayUniforms.hslLuminosity.value
-        break;
     }
 
     refreshUI();

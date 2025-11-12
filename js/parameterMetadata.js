@@ -22,7 +22,7 @@ export default {
   timestep: {
     min: 0.0,
     max: 2.0,
-    initial: 1.0
+    initial: 0.2
   },
   canvas: {
     width: {
@@ -37,7 +37,7 @@ export default {
     },
     scale: {
       min: .01,
-      max: 3,
+      max: 5,
       initial: 1
     }
   },

@@ -12,22 +12,54 @@ import parameterValues from '../parameterValues';
 import parameterMetadata from '../parameterMetadata';
 import parameterPresets from '../parameterPresets';
 
-import { simulationUniforms, displayUniforms } from '../uniforms';
+import { simulationUniforms } from '../uniforms';
 
 import { InitialTextureTypes, drawFirstFrame } from '../firstFrame';
 import { resetTextureSizes } from '../../entry';
 import { setupRenderTargets } from '../renderTargets';
 import { expandMap } from '../map';
 import { exportImage } from '../export';
+import { loadFontFromBuffer } from '../fontLoader';
+import { exportBothFormats } from '../vectorExport';
 
 let pane;
+let paneContainer;
 export let currentSeedType = InitialTextureTypes.CIRCLE;
 
 let seedImageChooser;
+let fontChooser;
+let textSeedTextarea;
+let textSeedContainer;
+
+function clearTextSeedContainer() {
+  if(textSeedContainer && textSeedContainer.parentNode) {
+    textSeedContainer.parentNode.removeChild(textSeedContainer);
+  }
+  textSeedContainer = null;
+  textSeedTextarea = null;
+}
+
+function getTextPlaceholder() {
+  return parameterValues.mode === 'glyph'
+    ? 'Enter glyph (single character)'
+    : 'Enter sample text or alphabet';
+}
 
 export function setupRightPane() {
-  pane = new Tweakpane({ title: 'Parameters' });
+  if(paneContainer === undefined) {
+    paneContainer = document.createElement('div');
+    paneContainer.setAttribute('id', 'right-pane-container');
+    document.body.appendChild(paneContainer);
+  }
 
+  pane = new Tweakpane({
+    title: 'Parameters',
+    container: paneContainer
+  });
+  textSeedTextarea = null;
+  textSeedContainer = null;
+
+  setupWorkspaceFolder();
   setupReactionDiffusionParameters();
   setupSeedFolder();
   setupRenderingFolder();
@@ -54,6 +86,42 @@ export function setupRightPane() {
       reader.readAsDataURL(e.target.files[0]);
     });
   }
+
+  if(fontChooser == undefined || fontChooser == null) {
+    fontChooser = document.getElementById('font-chooser');
+
+    fontChooser.addEventListener('change', (e) => {
+      if(e.target.files.length == 0) {
+        return;
+      }
+
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = function() {
+        loadFontFromBuffer(reader.result)
+          .then((font) => {
+            parameterValues.seed.font.filename = file.name;
+            parameterValues.seed.font.fontLoaded = true;
+            parameterValues.seed.font.useCustomFont = true;
+            
+            console.log('Font loaded:', file.name);
+            rebuildRightPane();
+            
+            // Redraw if we're in text mode
+            if(currentSeedType === InitialTextureTypes.TEXT) {
+              drawFirstFrame(currentSeedType);
+            }
+          })
+          .catch((error) => {
+            alert('Error loading font: ' + error.message);
+            console.error('Font loading error:', error);
+          });
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  }
 }
 
   export function rebuildRightPane() {
@@ -63,6 +131,11 @@ export function setupRightPane() {
 
   export function refreshRightPane() {
     pane.refresh();
+    if(textSeedTextarea) {
+      textSeedTextarea.value = parameterValues.seed.text.value;
+      textSeedTextarea.rows = Math.max(3, parameterValues.seed.text.value.split(/\r?\n/).length);
+      textSeedTextarea.placeholder = getTextPlaceholder();
+    }
   }
 
   export function hideRightPane() {
@@ -72,6 +145,58 @@ export function setupRightPane() {
   export function showRightPane() {
     pane.containerElem_.style.display = 'block';
   }
+
+
+//==============================================================
+//  WORKSPACE
+//==============================================================
+function setupWorkspaceFolder() {
+  const workspaceFolder = pane.addFolder({ title: 'Workspace' });
+
+  workspaceFolder.addInput(parameterValues, 'mode', {
+    label: 'Mode',
+    options: {
+      'Alphabet preview': 'preview',
+      'Glyph workshop': 'glyph'
+    }
+  })
+    .on('change', (value) => {
+      parameterValues.mode = value;
+      applyModeDefaults(value);
+    });
+
+  workspaceFolder.addInput(parameterValues.canvas, 'resolutionPreset', {
+    label: 'Resolution',
+    options: {
+      'Preview (1x)': 1,
+      'Detail (2x)': 2,
+      'Ultra (3x)': 3,
+      'Max (4x)': 4
+    }
+  })
+    .on('change', (value) => {
+      parameterValues.canvas.scale = parseFloat(value);
+      resetTextureSizes();
+      drawFirstFrame(currentSeedType);
+    });
+}
+
+function applyModeDefaults(mode) {
+  if(mode === 'preview') {
+    if(parameterValues.seed.text.value.length <= 1) {
+      parameterValues.seed.text.value = 'A  B  C  D  E  F\nG  H  I  J  K  L\nM  N  O  P  Q  R\nS  T  U  V  W  X\nY  Z  .  ,  -  /  (  )';
+    }
+  } else if(mode === 'glyph') {
+    const trimmed = parameterValues.seed.text.value.trim();
+    parameterValues.seed.text.value = trimmed.length > 0 ? trimmed.charAt(0) : 'A';
+  }
+
+  if(currentSeedType === InitialTextureTypes.TEXT) {
+    drawFirstFrame(currentSeedType);
+  }
+
+  rebuildRightPane();
+}
 
 
 //==============================================================
@@ -185,18 +310,22 @@ function setupSeedFolder() {
 
   switch(currentSeedType) {
     case 0:
+      clearTextSeedContainer();
       addCircleOptions(seedFolder);
       break;
 
     case 1:
+      clearTextSeedContainer();
       addSquareOptions(seedFolder);
       break;
 
     case 2:
+      clearTextSeedContainer();
       addTextOptions(seedFolder);
       break;
 
     case 3:
+      clearTextSeedContainer();
       addImageOptions(seedFolder);
       break;
   }
@@ -243,16 +372,67 @@ function setupSeedFolder() {
       label: 'Rotation',
       min: -180,
       max: 180
-    })
-      .on('change', (value) => {
-        console.log(typeof(value));
-      })
+    });
   }
 
   function addTextOptions(folder) {
-    folder.addInput(parameterValues.seed.text, 'value', {
-      label: 'Text'
+    const doc = window.document;
+    const container = doc.createElement('div');
+    container.classList.add('tp-textarea-block');
+
+    const label = doc.createElement('label');
+    label.textContent = 'Text';
+    label.classList.add('tp-textarea-block__label');
+    label.setAttribute('for', 'seed-textarea');
+    container.appendChild(label);
+
+    textSeedTextarea = doc.createElement('textarea');
+    textSeedTextarea.id = 'seed-textarea';
+    textSeedTextarea.classList.add('tp-textarea-block__input');
+    textSeedTextarea.rows = Math.max(3, parameterValues.seed.text.value.split(/\r?\n/).length);
+    textSeedTextarea.value = parameterValues.seed.text.value;
+    textSeedTextarea.placeholder = getTextPlaceholder();
+    textSeedTextarea.addEventListener('input', (event) => {
+      parameterValues.seed.text.value = event.target.value;
     });
+
+    container.appendChild(textSeedTextarea);
+
+    const targetView = folder.controller && folder.controller.view ? folder.controller.view.element : null;
+    if(targetView) {
+      targetView.appendChild(container);
+    } else {
+      console.warn('Unable to locate folder view for text seed textarea');
+      pane.containerElem_.appendChild(container);
+    }
+    textSeedContainer = container;
+
+    folder.addSeparator();
+
+    // Font upload controls
+    folder.addMonitor(parameterValues.seed.font, 'filename', {
+      label: 'Custom font'
+    });
+
+    folder.addButton({
+      title: '📁 Upload font file (TTF/OTF)'
+    })
+      .on('click', () => {
+        fontChooser.click();
+      });
+
+    folder.addInput(parameterValues.seed.font, 'useCustomFont', {
+      label: 'Use custom font'
+    })
+      .on('change', (value) => {
+        if(value && !parameterValues.seed.font.fontLoaded) {
+          alert('Please upload a font file first!');
+          parameterValues.seed.font.useCustomFont = false;
+          rebuildRightPane();
+        }
+      });
+
+    folder.addSeparator();
 
     folder.addInput(parameterValues.seed.text, 'size', {
       label: 'Size',
@@ -310,171 +490,11 @@ function setupSeedFolder() {
 function setupRenderingFolder() {
   const renderingFolder = pane.addFolder({ title: 'Rendering' });
 
-  // Rendering style dropdown
-  renderingFolder.addInput(parameterValues, 'renderingStyle', {
-    label: 'Style',
-    options: {
-      'HSL mapping': 0,
-      'Gradient': 1,
-      'Red Blob Games (original)': 2,
-      'Red Blob Games (alt 1)': 3,
-      'Red Blob Games (alt 2)': 4,
-      'Rainbow': 5,
-      'Black and white (soft)': 6,
-      'Black and white (hard)': 7,
-      'Raw': 8
-    }
-  })
-    .on('change', (value) => {
-      displayUniforms.renderingStyle.value = value;
-      rebuildRightPane();
+  renderingFolder.addInput(parameterValues, 'useSmoothing', { label: 'Use smoothing' })
+    .on('change', () => {
+      setupRenderTargets();
     });
-
-  renderingFolder.addInput(parameterValues, 'useSmoothing', { label: 'Use smoothing' });
-
-  renderingFolder.addSeparator();
-
-  addRenderingStyleOptions(renderingFolder);
 }
-
-  function addRenderingStyleOptions(folder) {
-    switch(parseInt(displayUniforms.renderingStyle.value)) {
-      case 0:
-        addHSLMappingOptions(folder);
-        break;
-
-      case 1:
-        addGradientOptions(folder);
-        break;
-
-      default:
-    }
-  }
-
-    function addGradientOptions(folder) {
-      // Color 1 --------------------------------------------
-      folder.addInput(parameterValues.gradientColors, 'color1RGB', { label: 'Color 1' })
-        .on('change', (value) => {
-          displayUniforms.colorStop1.value = new THREE.Vector4(value.r/255, value.g/255, value.b/255, displayUniforms.colorStop1.value.w);
-        });
-
-      folder.addInput(parameterValues.gradientColors, 'color1Stop', { label: 'Threshold', min: 0.0, max: 1.0 })
-        .on('change', (value) => { displayUniforms.colorStop1.value.w = value; });
-
-      folder.addInput(parameterValues.gradientColors, 'color1Enabled', { label: 'Enabled' })
-        .on('change', (checked) => {
-          if(checked) {
-            displayUniforms.colorStop1.value = parameterValues.lastColorStop1;
-          } else {
-            parameterValues.lastColorStop1 = displayUniforms.colorStop1.value;
-            displayUniforms.colorStop1.value = new THREE.Vector4(-1, -1, -1, -1);
-          }
-        });
-
-      folder.addSeparator();
-
-      // Color 2 --------------------------------------------
-      folder.addInput(parameterValues.gradientColors, 'color2RGB', { label: 'Color 2' })
-        .on('change', (value) => {
-          displayUniforms.colorStop2.value = new THREE.Vector4(value.r/255, value.g/255, value.b/255, displayUniforms.colorStop2.value.w);
-        });
-
-      folder.addInput(parameterValues.gradientColors, 'color2Stop', { label: 'Threshold', min: 0.0, max: 1.0 })
-        .on('change', (value) => { displayUniforms.colorStop2.value.w = value; });
-
-      folder.addInput(parameterValues.gradientColors, 'color2Enabled', { label: 'Enabled' })
-        .on('change', (checked) => {
-          if(checked) {
-            displayUniforms.colorStop2.value = parameterValues.lastColorStop2;
-          } else {
-            parameterValues.lastColorStop2 = displayUniforms.colorStop2.value;
-            displayUniforms.colorStop2.value = new THREE.Vector4(-1, -1, -1, -1);
-          }
-        });
-
-      folder.addSeparator();
-
-      // Color 3 --------------------------------------------
-      folder.addInput(parameterValues.gradientColors, 'color3RGB', { label: 'Color 3' })
-        .on('change', (value) => {
-          displayUniforms.colorStop3.value = new THREE.Vector4(value.r/255, value.g/255, value.b/255, displayUniforms.colorStop3.value.w);
-        });
-
-      folder.addInput(parameterValues.gradientColors, 'color3Stop', { label: 'Threshold', min: 0.0, max: 1.0 })
-        .on('change', (value) => { displayUniforms.colorStop3.value.w = value; });
-
-      folder.addInput(parameterValues.gradientColors, 'color3Enabled', { label: 'Enabled' })
-        .on('change', (checked) => {
-          if(checked) {
-            displayUniforms.colorStop3.value = parameterValues.lastColorStop3;
-          } else {
-            parameterValues.lastColorStop3 = displayUniforms.colorStop3.value;
-            displayUniforms.colorStop3.value = new THREE.Vector4(-1, -1, -1, -1);
-          }
-        });
-
-      folder.addSeparator();
-
-      // Color 4 --------------------------------------------
-      folder.addInput(parameterValues.gradientColors, 'color4RGB', { label: 'Color 4' })
-        .on('change', (value) => {
-          displayUniforms.colorStop4.value = new THREE.Vector4(value.r/255, value.g/255, value.b/255, displayUniforms.colorStop4.value.w);
-        });
-
-      folder.addInput(parameterValues.gradientColors, 'color4Stop', { label: 'Threshold', min: 0.0, max: 1.0 })
-        .on('change', (value) => { displayUniforms.colorStop4.value.w = value; });
-
-      folder.addInput(parameterValues.gradientColors, 'color4Enabled', { label: 'Enabled' })
-        .on('change', (checked) => {
-          if(checked) {
-            displayUniforms.colorStop4.value = parameterValues.lastColorStop4;
-          } else {
-            parameterValues.lastColorStop4 = displayUniforms.colorStop4.value;
-            displayUniforms.colorStop4.value = new THREE.Vector4(-1, -1, -1, -1);
-          }
-        });
-
-      folder.addSeparator();
-
-      // Color 5 --------------------------------------------
-      folder.addInput(parameterValues.gradientColors, 'color5RGB', { label: 'Color 5' })
-        .on('change', (value) => {
-          displayUniforms.colorStop5.value = new THREE.Vector4(value.r/255, value.g/255, value.b/255, displayUniforms.colorStop5.value.w);
-        });
-
-      folder.addInput(parameterValues.gradientColors, 'color5Stop', { label: 'Threshold', min: 0.0, max: 1.0 })
-        .on('change', (value) => { displayUniforms.colorStop5.value.w = value; });
-
-      folder.addInput(parameterValues.gradientColors, 'color5Enabled', { label: 'Enabled' })
-        .on('change', (checked) => {
-          if(checked) {
-            displayUniforms.colorStop5.value = parameterValues.lastColorStop5;
-          } else {
-            parameterValues.lastColorStop5 = displayUniforms.colorStop5.value;
-            displayUniforms.colorStop5.value = new THREE.Vector4(-1, -1, -1, -1);
-          }
-        });
-    }
-
-    function addHSLMappingOptions(folder) {
-      folder.addInput(parameterValues.hsl.from, 'min', { label: 'Chemical range (low)', min: 0.0, max: 1.0, step: .0001 })
-        .on('change', (value) => { displayUniforms.hslFrom.value.x = value; });
-
-      folder.addInput(parameterValues.hsl.from, 'max', { label: 'Chemical range (high)', min: 0.0, max: 1.0, step: .0001 })
-        .on('change', (value) => { displayUniforms.hslFrom.value.y = value; });
-
-      folder.addInput(parameterValues.hsl.to, 'min', { label: 'Hue range (low)', min: 0.0, max: 1.0, step: .0001 })
-        .on('change', (value) => { displayUniforms.hslTo.value.x = value; });
-
-      folder.addInput(parameterValues.hsl.to, 'max', { label: 'Hue range (high)', min: 0.0, max: 1.0, step: .0001 })
-        .on('change', (value) => { displayUniforms.hslTo.value.y = value; });
-
-      folder.addInput(parameterValues.hsl, 'saturation', { label: 'Saturation', min: 0.0, max: 1.0 })
-        .on('change', (value) => { displayUniforms.hslSaturation.value = value; });
-
-      folder.addInput(parameterValues.hsl, 'luminosity', { label: 'Luminosity', min: 0.0, max: 1.0 })
-        .on('change', (value) => { displayUniforms.hslLuminosity.value = value; });
-    }
 
 
 //==============================================================
@@ -585,5 +605,49 @@ function setupActions() {
   })
     .on('click', () => {
       exportImage();
+    });
+
+  actionsFolder.addSeparator();
+
+  // Vector export settings
+  actionsFolder.addInput(parameterValues.export, 'threshold', {
+    label: 'Export threshold',
+    min: 0,
+    max: 255,
+    step: 1
+  });
+
+  actionsFolder.addInput(parameterValues.export, 'resolution', {
+    label: 'Export resolution',
+    options: {
+      '1x': 1,
+      '2x': 2,
+      '4x': 4,
+      '8x': 8
+    }
+  });
+
+  // Export as SVG button
+  actionsFolder.addButton({
+    title: '📤 Export as SVG'
+  })
+    .on('click', async () => {
+      try {
+        const { exportAsSVG, downloadSVG } = await import('../vectorExport');
+        const svg = await exportAsSVG(parameterValues.export.threshold, parameterValues.export.resolution);
+        downloadSVG(svg);
+        console.log('SVG exported successfully');
+      } catch (error) {
+        console.error('SVG export failed:', error);
+        alert('SVG export failed: ' + error.message);
+      }
+    });
+
+  // Export both PNG and SVG
+  actionsFolder.addButton({
+    title: '📦 Export PNG + SVG'
+  })
+    .on('click', () => {
+      exportBothFormats(parameterValues.export.threshold, parameterValues.export.resolution);
     });
 }

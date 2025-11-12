@@ -24,11 +24,18 @@ module.exports = {
   devServer: {
     host: '127.0.0.1',
     port: 9001,
-    publicPath: '/dist/',
-    contentBase: path.resolve('./'),
+    static: {
+      directory: path.resolve('./'),
+      watch: true
+    },
+    devMiddleware: {
+      publicPath: '/dist/'
+    },
     compress: true,
     open: true,
-    watchContentBase: true
+    watchFiles: {
+      paths: ['app.html', 'index.html', 'css/**/*', 'js/**/*', 'glsl/**/*']
+    }
   },
   output: {
     filename: '[name].bundle.js',

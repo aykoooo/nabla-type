@@ -3,11 +3,22 @@ import parameterMetadata from './parameterMetadata';
 export default {
   presets: '',
 
+  mode: 'preview',
+
   f: parameterMetadata.f.initial,
   k: parameterMetadata.k.initial,
   dA: parameterMetadata.dA.initial,
   dB: parameterMetadata.dB.initial,
   timestep: parameterMetadata.timestep.initial,
+
+  typography: {
+    ascenderRatio: 0.2,
+    capHeightRatio: 0.32,
+    xHeightRatio: 0.48,
+    baselineRatio: 0.72,
+    descenderRatio: 0.9,
+    lineHeight: 1.2
+  },
 
   seed: {
     type: 0,
@@ -30,50 +41,22 @@ export default {
       fit: 0,
       scale: 1.0,
       rotation: 0
+    },
+    font: {
+      filename: '',
+      fontLoaded: false,
+      useCustomFont: false
     }
   },
 
-  renderingStyle: '',
   useSmoothing: false,
-
-  gradientColors: {
-    color1RGB: {r:0, g:0, b:0},
-    color2RGB: {r:0, g:255, b:0},
-    color3RGB: {r:255, g:255, b:0},
-    color4RGB: {r:255, g:0, b:0},
-    color5RGB: {r:100, g:0, b:0},
-
-    color1Stop: 0,
-    color2Stop: .2,
-    color3Stop: .21,
-    color4Stop: .4,
-    color5Stop: .6,
-
-    color1Enabled: true,
-    color2Enabled: true,
-    color3Enabled: true,
-    color4Enabled: true,
-    color5Enabled: true
-  },
-
-  hsl: {
-    from: {
-      min: 0.0,
-      max: 1.0
-    },
-    to: {
-      min: .21,
-      max: .85
-    },
-    saturation: .7,
-    luminosity: .7
-  },
 
   canvas: {
     width: parameterMetadata.canvas.width.initial,
     height: parameterMetadata.canvas.height.initial,
     scale: parameterMetadata.canvas.scale.initial,
-    isMaximized: false
+    isMaximized: false,
+    resolutionPreset: 1
   },
 
   styleMap: {
@@ -99,5 +82,10 @@ export default {
   bias: {
     x: parameterMetadata.bias.x.initial,
     y: parameterMetadata.bias.y.initial
+  },
+
+  export: {
+    threshold: 128,
+    resolution: 2
   }
 };

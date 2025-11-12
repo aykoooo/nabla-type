@@ -63,6 +63,31 @@
   .tp-dfwv { width: 350px !important; }
   .tp-lblv_v { width: 250px !important; }
 
+  #container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-block;
+  }
+
+  #guideline-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  #guideline-overlay .guideline {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.15);
+  }
+
   canvas { display: block; }
   </style>
 </head>
@@ -106,6 +131,9 @@
 
   <!-- Visually-hidden file chooser for loading custom seed image. -->
   <input type="file" id="seed-image-chooser" accept="image/*" class="sr-only">
+
+  <!-- Visually-hidden file chooser for loading custom fonts. -->
+  <input type="file" id="font-chooser" accept=".ttf,.otf,.woff,.woff2" class="sr-only">
 
   <script src="dist/main.bundle.js"></script>
 </body>

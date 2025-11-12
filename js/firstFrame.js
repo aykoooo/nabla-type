@@ -7,8 +7,10 @@
 import * as THREE from 'three';
 
 import parameterValues from './parameterValues';
+import { getTypographyMetrics } from './guidelines';
 import { displayUniforms, passthroughUniforms } from './uniforms';
 import { displayMaterial, passthroughMaterial } from './materials';
+import { hasFontLoaded, drawTextWithFont } from './fontLoader';
 
 let bufferImage, bufferCanvasCtx;
 
@@ -63,23 +65,44 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
       renderInitialDataToRenderTargets( convertPixelsToTextureData() );
       break;
 
-    case InitialTextureTypes.TEXT:
+    case InitialTextureTypes.TEXT: {
       bufferCanvasCtx.fillStyle = '#000';
-      bufferCanvasCtx.font = '900 ' + parameterValues.seed.text.size + 'px Arial';
+      
+      const useCustomFont = parameterValues.seed.font.useCustomFont && hasFontLoaded();
+      
+      if (!useCustomFont) {
+        // Use system Arial as fallback
+        bufferCanvasCtx.font = '900 ' + parameterValues.seed.text.size + 'px Arial';
+      }
+      
       bufferCanvasCtx.textAlign = 'center';
+      bufferCanvasCtx.textBaseline = 'alphabetic';
+
+      const multilineText = parameterValues.seed.text.value || 'A';
+      const textLines = multilineText.split(/\r?\n/);
+      const lineHeight = parameterValues.seed.text.size * parameterValues.typography.lineHeight;
+      const metrics = getTypographyMetrics(parameterValues.canvas.height);
 
       bufferCanvasCtx.translate(parameterValues.canvas.width/2, parameterValues.canvas.height/2);
       bufferCanvasCtx.rotate(parameterValues.seed.text.rotation * Math.PI / 180);
       bufferCanvasCtx.translate(-parameterValues.canvas.width/2, -parameterValues.canvas.height/2);
 
-      bufferCanvasCtx.fillText(
-        parameterValues.seed.text.value,
-        centerX, centerY
-      );
+      textLines.forEach((line, index) => {
+        const baselineY = metrics.baseline - ((textLines.length - 1) - index) * lineHeight;
+        
+        if (useCustomFont) {
+          // Use custom loaded font
+          drawTextWithFont(bufferCanvasCtx, line, centerX, baselineY, parameterValues.seed.text.size);
+        } else {
+          // Use system font
+          bufferCanvasCtx.fillText(line, centerX, baselineY);
+        }
+      });
 
       bufferCanvasCtx.resetTransform();
       renderInitialDataToRenderTargets( convertPixelsToTextureData() );
       break;
+    }
 
     case InitialTextureTypes.IMAGE:
       if(parameterValues.seed.image.image != null) {
