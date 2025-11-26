@@ -145,209 +145,209 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
   }
 }
 
-  function renderInitialDataToRenderTargets(initialData) {
-    // Put the initial data into a texture format that ThreeJS can pass into the render targets
-    let texture = new THREE.DataTexture(initialData, parameterValues.canvas.width, parameterValues.canvas.height, THREE.RGBAFormat, THREE.FloatType);
-    texture.flipY = true;  // DataTexture coordinates are vertically inverted compared to canvas coordinates
-    texture.needsUpdate = true;
+function renderInitialDataToRenderTargets(initialData) {
+  // Put the initial data into a texture format that ThreeJS can pass into the render targets
+  let texture = new THREE.DataTexture(initialData, parameterValues.canvas.width, parameterValues.canvas.height, THREE.RGBAFormat, THREE.FloatType);
+  texture.flipY = true;  // DataTexture coordinates are vertically inverted compared to canvas coordinates
+  texture.needsUpdate = true;
 
-    // Pass the DataTexture to the passthrough material
-    passthroughUniforms.textureToDisplay.value = texture;
+  // Pass the DataTexture to the passthrough material
+  passthroughUniforms.textureToDisplay.value = texture;
 
-    // Activate the passthrough material
-    displayMesh.material = passthroughMaterial;
+  // Activate the passthrough material
+  displayMesh.material = passthroughMaterial;
 
-    // Render the DataTexture into both of the render targets
-    for(let i=0; i<2; i++) {
-      renderer.setRenderTarget(renderTargets[i]);
-      renderer.render(scene, camera);
-    }
-
-    // GENERATE BOUNDARY MASK if enabled
-    if (parameterValues.boundary.enabled) {
-      generateBoundaryMask();
-    } else {
-      // Disable boundary if not enabled
-      simulationMaterial.uniforms.enableBoundary.value = false;
-    }
-
-    // Switch back to the display material and pass along the initial rendered texture
-    displayUniforms.textureToDisplay.value = renderTargets[0].texture;
-    displayUniforms.previousIterationTexture.value = renderTargets[0].texture;
-    displayMesh.material = displayMaterial;
-
-    // Set the render target back to the default display buffer and render the first frame
-    renderer.setRenderTarget(null);
+  // Render the DataTexture into both of the render targets
+  for(let i=0; i<2; i++) {
+    renderer.setRenderTarget(renderTargets[i]);
     renderer.render(scene, camera);
   }
 
-  function getImagePixels(imageData, centerX, centerY) {
-    // Create an asynchronous Promise that can be used to wait for the image to load
-    return new Promise((resolve) => {
-      bufferImage.src = imageData;
-
-      bufferImage.addEventListener('load', () => {
-        bufferCanvasCtx.translate(parameterValues.canvas.width/2 * parameterValues.seed.image.scale, parameterValues.canvas.height/2 * parameterValues.seed.image.scale);
-        bufferCanvasCtx.rotate(parameterValues.seed.image.rotation * Math.PI / 180);
-        bufferCanvasCtx.translate(-parameterValues.canvas.width/2 * parameterValues.seed.image.scale, -parameterValues.canvas.height/2 * parameterValues.seed.image.scale);
-
-        let startX, startY, width, height;
-
-        switch(parameterValues.seed.image.fit) {
-          // None - use the image's true dimensions
-          case 0:
-            startX = centerX - bufferImage.width/2;
-            startY = centerY - bufferImage.height/2;
-            width = bufferImage.width * parameterValues.seed.image.scale;
-            height = bufferImage.height * parameterValues.seed.image.scale;
-            break;
-
-          // Scale - scale the image up or down to fit the canvas without stretching
-          // https://stackoverflow.com/a/50165098
-          case 1:
-            const widthRatio = parameterValues.canvas.width / bufferImage.width,
-                  heightRatio = parameterValues.canvas.height / bufferImage.height,
-                  bestFitRatio = Math.min(widthRatio, heightRatio),
-                  scaledWidth = bufferImage.width * bestFitRatio,
-                  scaledHeight = bufferImage.height * bestFitRatio;
-
-            startX = centerX - scaledWidth/2;
-            startY = centerY - scaledHeight/2;
-            width = scaledWidth;
-            height = scaledHeight;
-            break;
-
-          // Stretch
-          case 2:
-            startX = 0;
-            startY = 0;
-            width = parameterValues.canvas.width;
-            height = parameterValues.canvas.height;
-            break;
-        }
-
-        bufferCanvasCtx.drawImage(bufferImage, startX, startY, width, height);
-
-        bufferCanvasCtx.resetTransform();
-        resolve(convertPixelsToTextureData());
-      });
-    });
+  // GENERATE BOUNDARY MASK if enabled
+  if (parameterValues.boundary.enabled) {
+    generateBoundaryMask();
+  } else {
+    // Disable boundary if not enabled
+    simulationMaterial.uniforms.enableBoundary.value = false;
   }
 
-  // Create initial data based on the current content of the invisible canvas
-  function convertPixelsToTextureData() {
-    let pixels = bufferCanvasCtx.getImageData(0, 0, parameterValues.canvas.width, parameterValues.canvas.height).data;
-    let data = new Float32Array(pixels.length);
+  // Switch back to the display material and pass along the initial rendered texture
+  displayUniforms.textureToDisplay.value = renderTargets[0].texture;
+  displayUniforms.previousIterationTexture.value = renderTargets[0].texture;
+  displayMesh.material = displayMaterial;
 
-    for(let i=0; i<data.length; i+=4) {
-      data[i] = 1.0;
-      data[i+1] = pixels[i+1] == 0 ? 0.5 : 0.0;
-      data[i+2] = 0.0;
-      data[i+3] = 0.0;
-    }
+  // Set the render target back to the default display buffer and render the first frame
+  renderer.setRenderTarget(null);
+  renderer.render(scene, camera);
+}
 
-    return data;
-  }
+function getImagePixels(imageData, centerX, centerY) {
+  // Create an asynchronous Promise that can be used to wait for the image to load
+  return new Promise((resolve) => {
+    bufferImage.src = imageData;
 
-  function randomInt(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
+    bufferImage.addEventListener('load', () => {
+      bufferCanvasCtx.translate(parameterValues.canvas.width/2 * parameterValues.seed.image.scale, parameterValues.canvas.height/2 * parameterValues.seed.image.scale);
+      bufferCanvasCtx.rotate(parameterValues.seed.image.rotation * Math.PI / 180);
+      bufferCanvasCtx.translate(-parameterValues.canvas.width/2 * parameterValues.seed.image.scale, -parameterValues.canvas.height/2 * parameterValues.seed.image.scale);
 
-  /**
-   * Generate boundary mask from current buffer canvas
-   * Called when boundary conditions are enabled
-   */
-  function generateBoundaryMask() {
-    let boundaryData;
-    
-    // Check if we have a custom drawn boundary
-    if (global.customDrawingBoundary) {
-      // Use custom drawn boundary directly
-      const imageData = global.customDrawingBoundary;
-      const width = imageData.width;
-      const height = imageData.height;
-      boundaryData = new Float32Array(width * height);
-      
-      // Convert ImageData to Float32Array
-      // BLACK = Wall/Constraint (pattern blocked) = 0.0
-      // TRANSPARENT/ERASED = Open space (pattern allowed) = 1.0
-      for (let i = 0; i < width * height; i++) {
-        const r = imageData.data[i * 4];
-        const g = imageData.data[i * 4 + 1];
-        const b = imageData.data[i * 4 + 2];
-        const a = imageData.data[i * 4 + 3];
-        
-        // If transparent (erased), allow pattern
-        if (a < 128) {
-          boundaryData[i] = 1.0;  // Open space - pattern can go here
-        } else {
-          // If opaque, check luminance
-          const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-          // Black = wall (0.0), White = open (1.0)
-          boundaryData[i] = luminance < 128 ? 0.0 : 1.0;
-        }
+      let startX, startY, width, height;
+
+      switch(parameterValues.seed.image.fit) {
+        // None - use the image's true dimensions
+        case 0:
+          startX = centerX - bufferImage.width/2;
+          startY = centerY - bufferImage.height/2;
+          width = bufferImage.width * parameterValues.seed.image.scale;
+          height = bufferImage.height * parameterValues.seed.image.scale;
+          break;
+
+        // Scale - scale the image up or down to fit the canvas without stretching
+        // https://stackoverflow.com/a/50165098
+        case 1:
+          const widthRatio = parameterValues.canvas.width / bufferImage.width,
+                heightRatio = parameterValues.canvas.height / bufferImage.height,
+                bestFitRatio = Math.min(widthRatio, heightRatio),
+                scaledWidth = bufferImage.width * bestFitRatio,
+                scaledHeight = bufferImage.height * bestFitRatio;
+
+          startX = centerX - scaledWidth/2;
+          startY = centerY - scaledHeight/2;
+          width = scaledWidth;
+          height = scaledHeight;
+          break;
+
+        // Stretch
+        case 2:
+          startX = 0;
+          startY = 0;
+          width = parameterValues.canvas.width;
+          height = parameterValues.canvas.height;
+          break;
       }
-      
-      console.log('Using custom drawn boundary mask (inverted: black=wall, transparent=open)');
-    } else {
-      // Generate boundary from seed pattern
-      boundaryData = createBoundaryMask(bufferCanvas, {
-        mode: parameterValues.boundary.mode,
-        padding: parameterValues.boundary.padding,
-        erosion: parameterValues.boundary.erosion,
-        blurRadius: parameterValues.boundary.blurRadius,
-        invert: parameterValues.boundary.invert
-      });
-    }
 
-    // DEBUG: Check if boundary data contains non-zero values
-    let nonZeroCount = 0;
-    let oneCount = 0;
-    for (let i = 0; i < Math.min(boundaryData.length, 1000); i++) {
-      if (boundaryData[i] > 0) nonZeroCount++;
-      if (boundaryData[i] >= 1.0) oneCount++;
-    }
-    console.log('Boundary mask sample (first 1000 pixels):', {
-      nonZero: nonZeroCount,
-      ones: oneCount,
-      min: Math.min(...Array.from(boundaryData).slice(0, 1000)),
-      max: Math.max(...Array.from(boundaryData).slice(0, 1000))
+      bufferCanvasCtx.drawImage(bufferImage, startX, startY, width, height);
+
+      bufferCanvasCtx.resetTransform();
+      resolve(convertPixelsToTextureData());
     });
+  });
+}
 
-    // Create DataTexture from boundary mask (single channel, red format)
-    const boundaryTexture = new THREE.DataTexture(
-      boundaryData,
-      parameterValues.canvas.width,
-      parameterValues.canvas.height,
-      THREE.RedFormat,
-      THREE.FloatType
-    );
-    boundaryTexture.flipY = true;  // Match DataTexture coordinate system
-    boundaryTexture.needsUpdate = true;
+// Create initial data based on the current content of the invisible canvas
+function convertPixelsToTextureData() {
+  let pixels = bufferCanvasCtx.getImageData(0, 0, parameterValues.canvas.width, parameterValues.canvas.height).data;
+  let data = new Float32Array(pixels.length);
 
-    // Pass boundary texture to simulation shader
-    simulationMaterial.uniforms.boundaryMask.value = boundaryTexture;
-    simulationMaterial.uniforms.enableBoundary.value = true;
+  for(let i=0; i<data.length; i+=4) {
+    data[i] = 1.0;
+    data[i+1] = pixels[i+1] == 0 ? 0.5 : 0.0;
+    data[i+2] = 0.0;
+    data[i+3] = 0.0;
+  }
+
+  return data;
+}
+
+function randomInt(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Generate boundary mask from current buffer canvas
+ * Called when boundary conditions are enabled
+ */
+function generateBoundaryMask() {
+  let boundaryData;
+  
+  // Check if we have a custom drawn boundary
+  if (global.customDrawingBoundary) {
+    // Use custom drawn boundary directly
+    const imageData = global.customDrawingBoundary;
+    const width = imageData.width;
+    const height = imageData.height;
+    boundaryData = new Float32Array(width * height);
     
-    // Pass boundary texture to display shader for overlay visualization
-    displayMaterial.uniforms.boundaryMaskDisplay.value = boundaryTexture;
-    
-    // Set soft boundary falloff if in 'soft' mode
-    if (parameterValues.boundary.mode === 'soft') {
-      simulationMaterial.uniforms.boundaryFalloff.value = 0.3;
-    } else {
-      simulationMaterial.uniforms.boundaryFalloff.value = 0.0;
+    // Convert ImageData to Float32Array
+    // BLACK = Wall/Constraint (pattern blocked) = 0.0
+    // TRANSPARENT/ERASED = Open space (pattern allowed) = 1.0
+    for (let i = 0; i < width * height; i++) {
+      const r = imageData.data[i * 4];
+      const g = imageData.data[i * 4 + 1];
+      const b = imageData.data[i * 4 + 2];
+      const a = imageData.data[i * 4 + 3];
+      
+      // If transparent (erased), allow pattern
+      if (a < 128) {
+        boundaryData[i] = 1.0;  // Open space - pattern can go here
+      } else {
+        // If opaque, check luminance
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        // Black = wall (0.0), White = open (1.0)
+        boundaryData[i] = luminance < 128 ? 0.0 : 1.0;
+      }
     }
-
-    console.log('Boundary mask generated:', {
+    
+    console.log('Using custom drawn boundary mask (inverted: black=wall, transparent=open)');
+  } else {
+    // Generate boundary from seed pattern
+    boundaryData = createBoundaryMask(bufferCanvas, {
       mode: parameterValues.boundary.mode,
-      size: `${parameterValues.canvas.width}x${parameterValues.canvas.height}`,
-      enabled: true,
-      uniformValue: simulationMaterial.uniforms.enableBoundary.value
+      padding: parameterValues.boundary.padding,
+      erosion: parameterValues.boundary.erosion,
+      blurRadius: parameterValues.boundary.blurRadius,
+      invert: parameterValues.boundary.invert
     });
   }
 
-  // Export generateBoundaryMask so it can be called from UI
-  export { generateBoundaryMask };
+  // DEBUG: Check if boundary data contains non-zero values
+  let nonZeroCount = 0;
+  let oneCount = 0;
+  for (let i = 0; i < Math.min(boundaryData.length, 1000); i++) {
+    if (boundaryData[i] > 0) nonZeroCount++;
+    if (boundaryData[i] >= 1.0) oneCount++;
+  }
+  console.log('Boundary mask sample (first 1000 pixels):', {
+    nonZero: nonZeroCount,
+    ones: oneCount,
+    min: Math.min(...Array.from(boundaryData).slice(0, 1000)),
+    max: Math.max(...Array.from(boundaryData).slice(0, 1000))
+  });
+
+  // Create DataTexture from boundary mask (single channel, red format)
+  const boundaryTexture = new THREE.DataTexture(
+    boundaryData,
+    parameterValues.canvas.width,
+    parameterValues.canvas.height,
+    THREE.RedFormat,
+    THREE.FloatType
+  );
+  boundaryTexture.flipY = true;  // Match DataTexture coordinate system
+  boundaryTexture.needsUpdate = true;
+
+  // Pass boundary texture to simulation shader
+  simulationMaterial.uniforms.boundaryMask.value = boundaryTexture;
+  simulationMaterial.uniforms.enableBoundary.value = true;
+  
+  // Pass boundary texture to display shader for overlay visualization
+  displayMaterial.uniforms.boundaryMaskDisplay.value = boundaryTexture;
+  
+  // Set soft boundary falloff if in 'soft' mode
+  if (parameterValues.boundary.mode === 'soft') {
+    simulationMaterial.uniforms.boundaryFalloff.value = 0.3;
+  } else {
+    simulationMaterial.uniforms.boundaryFalloff.value = 0.0;
+  }
+
+  console.log('Boundary mask generated:', {
+    mode: parameterValues.boundary.mode,
+    size: `${parameterValues.canvas.width}x${parameterValues.canvas.height}`,
+    enabled: true,
+    uniformValue: simulationMaterial.uniforms.enableBoundary.value
+  });
+}
+
+// Export generateBoundaryMask so it can be called from UI
+export { generateBoundaryMask };

@@ -83,22 +83,22 @@ export function setupLeftPane() {
   // TODO: setupScaleFolder();
 }
 
-  export function rebuildLeftPane() {
-    pane.dispose();
-    setupLeftPane();
-  }
+export function rebuildLeftPane() {
+  pane.dispose();
+  setupLeftPane();
+}
 
-  export function refreshLeftPane() {
-    pane.refresh();
-  }
+export function refreshLeftPane() {
+  pane.refresh();
+}
 
-  export function hideLeftPane() {
-    pane.containerElem_.style.display = 'none';
-  }
+export function hideLeftPane() {
+  pane.containerElem_.style.display = 'none';
+}
 
-  export function showLeftPane() {
-    pane.containerElem_.style.display = 'block';
-  }
+export function showLeftPane() {
+  pane.containerElem_.style.display = 'block';
+}
 
 
 //===========================================================

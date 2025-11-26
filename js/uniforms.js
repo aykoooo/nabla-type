@@ -120,10 +120,6 @@ export let displayUniforms = {
     type: "t",
     value: null
   },
-  contrast: {
-    type: "f",
-    value: parameterValues.rendering.contrast
-  },
   // HSL parameters
   hslFrom: {
     type: "v2",

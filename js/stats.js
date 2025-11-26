@@ -15,22 +15,22 @@ export function setupStats(_iterationsPerFrame) {
   setupFPSCounter();
 }
 
-  function setupIterationsCounter() {
-    iterCountEl = document.createElement('div');
-    iterCountEl.setAttribute('id', 'iteration-counter');
-    iterCountEl.innerHTML = 'test';
-    statsContainerEl.appendChild(iterCountEl);
-  }
+function setupIterationsCounter() {
+  iterCountEl = document.createElement('div');
+  iterCountEl.setAttribute('id', 'iteration-counter');
+  iterCountEl.innerHTML = 'test';
+  statsContainerEl.appendChild(iterCountEl);
+}
 
-  function setupFPSCounter() {
-    fpsEl = document.createElement('div');
-    fpsEl.setAttribute('id', 'fps-counter');
-    statsContainerEl.appendChild(fpsEl);
+function setupFPSCounter() {
+  fpsEl = document.createElement('div');
+  fpsEl.setAttribute('id', 'fps-counter');
+  statsContainerEl.appendChild(fpsEl);
 
-    ticker.on('data', (framerate) => {
-      fpsEl.innerHTML = String(Math.round(framerate)) + ' fps';
-    });
-  }
+  ticker.on('data', (framerate) => {
+    fpsEl.innerHTML = String(Math.round(framerate)) + ' fps';
+  });
+}
 
 export function updateStats(isPaused) {
   ticker.tick();

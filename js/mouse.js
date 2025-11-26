@@ -6,7 +6,7 @@ import { simulationUniforms } from './uniforms';
 import parameterValues from './parameterValues';
 
 export function setupMouse() {
-  let mouseDown = false
+  let mouseDown = false;
 
   // Create a floating circle that follows the mouse cursor to indicate the current size of the brush
   let mouseFollower = document.createElement('div');

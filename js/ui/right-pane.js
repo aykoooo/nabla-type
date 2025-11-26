@@ -130,27 +130,27 @@ export function setupRightPane() {
   setupActions();
 }
 
-  export function rebuildRightPane() {
-    pane.dispose();
-    setupRightPane();
-  }
+export function rebuildRightPane() {
+  pane.dispose();
+  setupRightPane();
+}
 
-  export function refreshRightPane() {
-    pane.refresh();
-    if(textSeedTextarea) {
-      textSeedTextarea.value = parameterValues.seed.text.value;
-      textSeedTextarea.rows = Math.max(3, parameterValues.seed.text.value.split(/\r?\n/).length);
-      textSeedTextarea.placeholder = getTextPlaceholder();
-    }
+export function refreshRightPane() {
+  pane.refresh();
+  if(textSeedTextarea) {
+    textSeedTextarea.value = parameterValues.seed.text.value;
+    textSeedTextarea.rows = Math.max(3, parameterValues.seed.text.value.split(/\r?\n/).length);
+    textSeedTextarea.placeholder = getTextPlaceholder();
   }
+}
 
-  export function hideRightPane() {
-    pane.containerElem_.style.display = 'none';
-  }
+export function hideRightPane() {
+  pane.containerElem_.style.display = 'none';
+}
 
-  export function showRightPane() {
-    pane.containerElem_.style.display = 'block';
-  }
+export function showRightPane() {
+  pane.containerElem_.style.display = 'block';
+}
 
 
 //==============================================================
