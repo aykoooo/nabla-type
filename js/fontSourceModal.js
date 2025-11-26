@@ -8,8 +8,6 @@
 import parameterValues from './parameterValues';
 import { drawFirstFrame, InitialTextureTypes } from './firstFrame';
 import { loadFontFromBuffer, clearFont, hasFontLoaded } from './fontLoader';
-import { updateGuidelines } from './guidelines';
-import { rebuildRightPane } from './ui/right-pane';
 
 // Font source types
 export const FontSourceTypes = {
@@ -316,7 +314,11 @@ function applyFontChange() {
   }
   
   savePreferences();
-  rebuildRightPane();
+  
+  // Dynamically import and rebuild right pane to avoid circular dependencies
+  import('./ui/right-pane.js').then(module => {
+    module.rebuildRightPane();
+  });
   
   // Redraw if we're in text mode
   if (parameterValues.seed.type === InitialTextureTypes.TEXT) {

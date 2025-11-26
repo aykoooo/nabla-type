@@ -227,6 +227,12 @@ async function exportSingleGlyph(glyph, includeSVG) {
   // Wait for rendering
   await new Promise(resolve => setTimeout(resolve, 100));
   
+  // Check if renderer is available
+  if (!global.renderer || !global.renderer.domElement) {
+    console.error('Renderer not available');
+    return;
+  }
+  
   // Export PNG
   const canvas = global.renderer.domElement;
   const pngLink = document.createElement('a');
@@ -278,6 +284,13 @@ async function exportGlyphsSheet(glyphs, includeSVG) {
   
   // Wait for rendering
   await new Promise(resolve => setTimeout(resolve, 200));
+  
+  // Check if renderer is available
+  if (!global.renderer || !global.renderer.domElement) {
+    console.error('Renderer not available');
+    parameterValues.mode = originalMode;
+    return;
+  }
   
   // Export PNG
   const canvas = global.renderer.domElement;

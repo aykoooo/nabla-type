@@ -272,6 +272,12 @@ async function processGlyph(glyph, iterations, saveImage) {
   // The main loop runs automatically, we just need to wait
   await new Promise(resolve => setTimeout(resolve, 100));
   
+  // Check if renderer is available
+  if (!global.renderer || !global.renderer.domElement) {
+    console.error('Renderer not available for glyph:', glyph);
+    return;
+  }
+  
   // Capture the result
   const canvas = global.renderer.domElement;
   const imageData = canvas.toDataURL('image/png');
