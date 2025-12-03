@@ -25,6 +25,83 @@ export const InitialTextureTypes = {
   DRAWING: 5
 };
 
+/**
+ * Apply Gaussian blur to canvas using StackBlur algorithm
+ * Uses CSS filter for hardware acceleration when available
+ */
+function applyGaussianBlur(ctx, width, height, radius) {
+  if (radius <= 0) return;
+  
+  // Use CSS filter if available (much faster)
+  if (typeof ctx.filter !== 'undefined') {
+    // Get current image data
+    const imageData = ctx.getImageData(0, 0, width, height);
+    
+    // Clear and apply blur filter
+    ctx.filter = `blur(${radius}px)`;
+    ctx.putImageData(imageData, 0, 0);
+    
+    // Redraw with blur
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.putImageData(imageData, 0, 0);
+    
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(tempCanvas, 0, 0);
+    
+    // Reset filter
+    ctx.filter = 'none';
+  } else {
+    // Fallback: simple box blur (less accurate but works everywhere)
+    boxBlur(ctx, width, height, Math.ceil(radius));
+  }
+}
+
+/**
+ * Simple box blur fallback
+ */
+function boxBlur(ctx, width, height, radius) {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const copy = new Uint8ClampedArray(data);
+  
+  const kernelSize = radius * 2 + 1;
+  const kernelArea = kernelSize * kernelSize;
+  
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let r = 0, g = 0, b = 0, a = 0;
+      let count = 0;
+      
+      for (let ky = -radius; ky <= radius; ky++) {
+        for (let kx = -radius; kx <= radius; kx++) {
+          const nx = Math.min(width - 1, Math.max(0, x + kx));
+          const ny = Math.min(height - 1, Math.max(0, y + ky));
+          const idx = (ny * width + nx) * 4;
+          
+          r += copy[idx];
+          g += copy[idx + 1];
+          b += copy[idx + 2];
+          a += copy[idx + 3];
+          count++;
+        }
+      }
+      
+      const idx = (y * width + x) * 4;
+      data[idx] = r / count;
+      data[idx + 1] = g / count;
+      data[idx + 2] = b / count;
+      data[idx + 3] = a / count;
+    }
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+}
+
 export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
   // Reset iteration counter on every restart
   resetIterations();
@@ -239,12 +316,30 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
 
   // Create initial data based on the current content of the invisible canvas
   function convertPixelsToTextureData() {
+    // Apply blur if enabled
+    if (parameterValues.seed.blur > 0) {
+      applyGaussianBlur(bufferCanvasCtx, parameterValues.canvas.width, parameterValues.canvas.height, parameterValues.seed.blur);
+    }
+
     let pixels = bufferCanvasCtx.getImageData(0, 0, parameterValues.canvas.width, parameterValues.canvas.height).data;
     let data = new Float32Array(pixels.length);
 
+    // Use grayscale mode if explicitly enabled OR if blur is applied
+    const useGrayscale = parameterValues.seed.useGrayscale || parameterValues.seed.blur > 0;
+
     for(let i=0; i<data.length; i+=4) {
       data[i] = 1.0;
-      data[i+1] = pixels[i+1] == 0 ? 0.5 : 0.0;
+      
+      if (useGrayscale) {
+        // Grayscale mode: map brightness to chemical B concentration
+        // Black (0) = full seed (0.5), White (255) = no seed (0.0)
+        const brightness = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+        data[i+1] = (1.0 - brightness / 255.0) * 0.5;
+      } else {
+        // Binary mode: original behavior
+        data[i+1] = pixels[i+1] == 0 ? 0.5 : 0.0;
+      }
+      
       data[i+2] = 0.0;
       data[i+3] = 0.0;
     }

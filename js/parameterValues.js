@@ -22,6 +22,8 @@ export default {
 
   seed: {
     type: 0,
+    blur: 0,           // Gaussian blur radius (0 = no blur)
+    useGrayscale: false, // Use grayscale values instead of binary
     circle: {
       radius: 100
     },
@@ -31,7 +33,7 @@ export default {
       rotation: 0
     },
     text: {
-      value: 'Reaction diffusion',
+      value: 'R',
       size: 85,
       rotation: 0
     },

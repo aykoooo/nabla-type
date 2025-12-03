@@ -380,6 +380,26 @@ function setupSeedFolder() {
       break;
   }
 
+  // Seed processing options
+  seedFolder.addSeparator();
+
+  seedFolder.addInput(parameterValues.seed, 'blur', {
+    label: 'Blur radius',
+    min: 0,
+    max: 50,
+    step: 1
+  })
+    .on('change', () => {
+      drawFirstFrame(currentSeedType);
+    });
+
+  seedFolder.addInput(parameterValues.seed, 'useGrayscale', {
+    label: 'Use grayscale'
+  })
+    .on('change', () => {
+      drawFirstFrame(currentSeedType);
+    });
+
   // Restart button
   seedFolder.addButton({
     title: '⟳ Restart with this pattern'
