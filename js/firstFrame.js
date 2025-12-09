@@ -10,7 +10,7 @@ import parameterValues from './parameterValues';
 import { getTypographyMetrics } from './guidelines';
 import { displayUniforms, passthroughUniforms, simulationUniforms } from './uniforms';
 import { displayMaterial, passthroughMaterial, simulationMaterial } from './materials';
-import { hasFontLoaded, drawTextWithFont } from './fontLoader';
+import { hasFontLoaded, drawTextWithFont, measureTextWithFont } from './fontLoader';
 import { createBoundaryMask } from './boundaryProcessor';
 import { resetIterations } from './stats';
 
@@ -31,28 +31,28 @@ export const InitialTextureTypes = {
  */
 function applyGaussianBlur(ctx, width, height, radius) {
   if (radius <= 0) return;
-  
+
   // Use CSS filter if available (much faster)
   if (typeof ctx.filter !== 'undefined') {
     // Get current image data
     const imageData = ctx.getImageData(0, 0, width, height);
-    
+
     // Clear and apply blur filter
     ctx.filter = `blur(${radius}px)`;
     ctx.putImageData(imageData, 0, 0);
-    
+
     // Redraw with blur
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     tempCtx.putImageData(imageData, 0, 0);
-    
+
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, width, height);
     ctx.drawImage(tempCanvas, 0, 0);
-    
+
     // Reset filter
     ctx.filter = 'none';
   } else {
@@ -68,21 +68,21 @@ function boxBlur(ctx, width, height, radius) {
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
   const copy = new Uint8ClampedArray(data);
-  
+
   const kernelSize = radius * 2 + 1;
   const kernelArea = kernelSize * kernelSize;
-  
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       let r = 0, g = 0, b = 0, a = 0;
       let count = 0;
-      
+
       for (let ky = -radius; ky <= radius; ky++) {
         for (let kx = -radius; kx <= radius; kx++) {
           const nx = Math.min(width - 1, Math.max(0, x + kx));
           const ny = Math.min(height - 1, Math.max(0, y + ky));
           const idx = (ny * width + nx) * 4;
-          
+
           r += copy[idx];
           g += copy[idx + 1];
           b += copy[idx + 2];
@@ -90,7 +90,7 @@ function boxBlur(ctx, width, height, radius) {
           count++;
         }
       }
-      
+
       const idx = (y * width + x) * 4;
       data[idx] = r / count;
       data[idx + 1] = g / count;
@@ -98,7 +98,7 @@ function boxBlur(ctx, width, height, radius) {
       data[idx + 3] = a / count;
     }
   }
-  
+
   ctx.putImageData(imageData, 0, 0);
 }
 
@@ -153,9 +153,9 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
 
     case InitialTextureTypes.TEXT: {
       bufferCanvasCtx.fillStyle = '#000';
-      
+
       const useCustomFont = parameterValues.seed.font.useCustomFont && hasFontLoaded();
-      
+
       if (!useCustomFont) {
         // Map boldness 0-3 to font weights 400-900
         // 0 -> 400 (Normal)
@@ -167,27 +167,60 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
         else if (parameterValues.seed.text.boldness > 1.5) weight = 800;
         else if (parameterValues.seed.text.boldness > 0.5) weight = 600;
         else if (parameterValues.seed.text.boldness > 0) weight = 500;
-        
+
         bufferCanvasCtx.font = weight + ' ' + parameterValues.seed.text.size + 'px Arial';
       }
-      
+
       bufferCanvasCtx.textAlign = 'center';
       bufferCanvasCtx.textBaseline = 'alphabetic';
 
       const multilineText = parameterValues.seed.text.value || 'A';
       const textLines = multilineText.split(/\r?\n/);
-      const lineHeight = parameterValues.seed.text.size * parameterValues.typography.lineHeight;
-      const metrics = getTypographyMetrics(parameterValues.canvas.height);
+      const fontSize = parameterValues.seed.text.size;
+      const lineHeight = fontSize * parameterValues.typography.lineHeight;
+
+      let maxAscent = 0;
+      let maxDescent = 0;
+
+      if (useCustomFont) {
+        textLines.forEach(line => {
+          const m = measureTextWithFont(line, fontSize);
+          if (m) {
+            maxAscent = Math.max(maxAscent, m.ascent);
+            maxDescent = Math.max(maxDescent, m.descent);
+          }
+        });
+      }
+
+      if (!useCustomFont) {
+        textLines.forEach(line => {
+          const m = bufferCanvasCtx.measureText(line);
+          const a = m.actualBoundingBoxAscent || fontSize * 0.8;
+          const d = m.actualBoundingBoxDescent || fontSize * 0.2;
+          maxAscent = Math.max(maxAscent, a);
+          maxDescent = Math.max(maxDescent, d);
+        });
+      }
+
+      // Fallback if metrics were not obtained
+      if (maxAscent === 0 && maxDescent === 0) {
+        maxAscent = fontSize * 0.8;
+        maxDescent = fontSize * 0.2;
+      }
+
+      const textBlockHeight = (maxAscent + maxDescent) + (textLines.length - 1) * lineHeight;
+      const textBlockTop = centerY - (textBlockHeight / 2);
+      const baselineStart = textBlockTop + maxAscent;
 
       bufferCanvasCtx.translate(parameterValues.canvas.width/2, parameterValues.canvas.height/2);
       bufferCanvasCtx.rotate(parameterValues.seed.text.rotation * Math.PI / 180);
       bufferCanvasCtx.translate(-parameterValues.canvas.width/2, -parameterValues.canvas.height/2);
 
       textLines.forEach((line, index) => {
-        const baselineY = metrics.baseline - ((textLines.length - 1) - index) * lineHeight;
+        const baselineY = baselineStart + (index * lineHeight);
         
         if (useCustomFont) {
-          drawTextWithFont(bufferCanvasCtx, line, centerX, baselineY, parameterValues.seed.text.size, parameterValues.seed.text.boldness);
+          drawTextWithFont(bufferCanvasCtx, line, centerX, baselineY, fontSize, parameterValues.seed.text.boldness);
         } else {
           bufferCanvasCtx.fillText(line, centerX, baselineY);
         }
@@ -220,7 +253,7 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
       if (global.customDrawingSeed) {
         bufferCanvasCtx.putImageData(global.customDrawingSeed, 0, 0);
         renderInitialDataToRenderTargets( convertPixelsToTextureData() );
-        
+
         // If custom boundary was also drawn, use it
         if (global.customDrawingBoundary && parameterValues.boundary.enabled) {
           // Will be processed in generateBoundaryMask via bufferCanvas
@@ -337,7 +370,7 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
 
     for(let i=0; i<data.length; i+=4) {
       data[i] = 1.0;
-      
+
       if (useGrayscale) {
         // Grayscale mode: map brightness to chemical B concentration
         // Black (0) = full seed (0.5), White (255) = no seed (0.0)
@@ -347,7 +380,7 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
         // Binary mode: original behavior
         data[i+1] = pixels[i+1] == 0 ? 0.5 : 0.0;
       }
-      
+
       data[i+2] = 0.0;
       data[i+3] = 0.0;
     }
@@ -367,7 +400,7 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
    */
   function generateBoundaryMask() {
     let boundaryData;
-    
+
     // Check if we have a custom drawn boundary
     if (global.customDrawingBoundary) {
       // Use custom drawn boundary directly
@@ -375,7 +408,7 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
       const width = imageData.width;
       const height = imageData.height;
       boundaryData = new Float32Array(width * height);
-      
+
       // Convert ImageData to Float32Array
       // BLACK = Wall/Constraint (pattern blocked) = 0.0
       // TRANSPARENT/ERASED = Open space (pattern allowed) = 1.0
@@ -384,7 +417,7 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
         const g = imageData.data[i * 4 + 1];
         const b = imageData.data[i * 4 + 2];
         const a = imageData.data[i * 4 + 3];
-        
+
         // If transparent (erased), allow pattern
         if (a < 128) {
           boundaryData[i] = 1.0;  // Open space - pattern can go here
@@ -395,7 +428,7 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
           boundaryData[i] = luminance < 128 ? 0.0 : 1.0;
         }
       }
-      
+
       console.log('Using custom drawn boundary mask (inverted: black=wall, transparent=open)');
     } else {
       // Generate boundary from seed pattern
@@ -436,10 +469,10 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
     // Pass boundary texture to simulation shader
     simulationMaterial.uniforms.boundaryMask.value = boundaryTexture;
     simulationMaterial.uniforms.enableBoundary.value = true;
-    
+
     // Pass boundary texture to display shader for overlay visualization
     displayMaterial.uniforms.boundaryMaskDisplay.value = boundaryTexture;
-    
+
     // Set soft boundary falloff if in 'soft' mode
     if (parameterValues.boundary.mode === 'soft') {
       simulationMaterial.uniforms.boundaryFalloff.value = 0.3;

@@ -115,6 +115,28 @@ export function drawTextWithFont(context, text, x, y, fontSize, boldness = 0) {
 }
 
 /**
+ * Measure text metrics using the loaded custom font
+ * @param {string} text
+ * @param {number} fontSize
+ * @returns {{width:number, ascent:number, descent:number, height:number}|null}
+ */
+export function measureTextWithFont(text, fontSize) {
+  if (!loadedFont) return null;
+  try {
+    const path = loadedFont.getPath(text, 0, 0, fontSize);
+    const box = path.getBoundingBox();
+    const width = box.x2 - box.x1;
+    const height = box.y2 - box.y1;
+    const ascent = Math.max(0, -box.y1);
+    const descent = Math.max(0, box.y2);
+    return { width, ascent, descent, height };
+  } catch (err) {
+    console.warn('Failed to measure custom font text:', err);
+    return null;
+  }
+}
+
+/**
  * Get glyph metrics for a character
  * @param {string} char - Character to measure
  * @param {number} fontSize - Font size in pixels
