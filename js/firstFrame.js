@@ -157,8 +157,18 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
       const useCustomFont = parameterValues.seed.font.useCustomFont && hasFontLoaded();
       
       if (!useCustomFont) {
-        // Use system Arial as fallback
-        bufferCanvasCtx.font = '900 ' + parameterValues.seed.text.size + 'px Arial';
+        // Map boldness 0-3 to font weights 400-900
+        // 0 -> 400 (Normal)
+        // 1 -> 600 (Semi-Bold)
+        // 2 -> 800 (Extra-Bold)
+        // 3 -> 900 (Black)
+        let weight = 400;
+        if (parameterValues.seed.text.boldness > 2.5) weight = 900;
+        else if (parameterValues.seed.text.boldness > 1.5) weight = 800;
+        else if (parameterValues.seed.text.boldness > 0.5) weight = 600;
+        else if (parameterValues.seed.text.boldness > 0) weight = 500;
+        
+        bufferCanvasCtx.font = weight + ' ' + parameterValues.seed.text.size + 'px Arial';
       }
       
       bufferCanvasCtx.textAlign = 'center';
@@ -177,10 +187,8 @@ export function drawFirstFrame(type = InitialTextureTypes.CIRCLE) {
         const baselineY = metrics.baseline - ((textLines.length - 1) - index) * lineHeight;
         
         if (useCustomFont) {
-          // Use custom loaded font
-          drawTextWithFont(bufferCanvasCtx, line, centerX, baselineY, parameterValues.seed.text.size);
+          drawTextWithFont(bufferCanvasCtx, line, centerX, baselineY, parameterValues.seed.text.size, parameterValues.seed.text.boldness);
         } else {
-          // Use system font
           bufferCanvasCtx.fillText(line, centerX, baselineY);
         }
       });

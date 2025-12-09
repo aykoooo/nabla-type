@@ -528,6 +528,16 @@ function setupSeedFolder() {
         drawFirstFrame(currentSeedType);
       });
 
+    folder.addInput(parameterValues.seed.text, 'boldness', {
+      label: 'Boldness',
+      min: 0,
+      max: 3,
+      step: 0.1
+    })
+      .on('change', () => {
+        drawFirstFrame(currentSeedType);
+      });
+
     folder.addInput(parameterValues.seed.text, 'rotation', {
       label: 'Rotation',
       min: -180,

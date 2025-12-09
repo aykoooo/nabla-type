@@ -56,8 +56,9 @@ export function clearFont() {
  * @param {number} x - X position (will be adjusted for center alignment)
  * @param {number} y - Y position (baseline)
  * @param {number} fontSize - Font size in pixels
+ * @param {number} boldness - Stroke width multiplier (0 = normal, 1+ = bold)
  */
-export function drawTextWithFont(context, text, x, y, fontSize) {
+export function drawTextWithFont(context, text, x, y, fontSize, boldness = 0) {
   if (!loadedFont) {
     console.warn('No font loaded, using fallback');
     return false;
@@ -93,7 +94,19 @@ export function drawTextWithFont(context, text, x, y, fontSize) {
       }
     });
 
+    // Fill the path
     context.fill(p2d);
+    
+    // Apply bold effect with stroke
+    if (boldness > 0) {
+      const strokeWidth = fontSize * 0.1 * boldness;
+      context.strokeStyle = '#000';
+      context.lineWidth = strokeWidth;
+      context.lineJoin = 'miter';
+      context.miterLimit = 2;
+      context.stroke(p2d);
+    }
+    
     return true;
   } catch (error) {
     console.error('Error drawing text with font:', error);

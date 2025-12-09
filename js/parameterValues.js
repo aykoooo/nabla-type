@@ -35,7 +35,8 @@ export default {
     text: {
       value: 'R',
       size: 85,
-      rotation: 0
+      rotation: 0,
+      boldness: 0
     },
     image: {
       filename: '',
