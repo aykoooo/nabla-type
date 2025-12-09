@@ -1,6 +1,7 @@
 import parameterValues from './parameterValues.js';
 import parameterPresets from './parameterPresets.js';
 import { InitialTextureTypes } from './firstFrame.js';
+import { getLoadedFontName } from './fontLoader.js';
 
 /**
  * Generate a descriptive filename based on current simulation state
@@ -86,7 +87,7 @@ export function generateFilenameWithSeed(extension, seedType) {
 
     case InitialTextureTypes.TEXT:
       const text = sanitizeString(parameterValues.seed.text.value || 'empty');
-      const font = parameterValues.seed.font.useCustomFont ? 'CustomFont' : 'Arial';
+      const font = parameterValues.seed.font.useCustomFont ? (getLoadedFontName() || 'CustomFont') : 'Arial';
       const boldness = parameterValues.seed.text.boldness > 0 ? `-b${parameterValues.seed.text.boldness.toFixed(1)}` : '';
       seedInfo = `Text_${text}_${font}${boldness}`;
       break;

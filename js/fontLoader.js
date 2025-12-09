@@ -1,6 +1,7 @@
 import opentype from 'opentype.js';
 
 let loadedFont = null;
+let loadedFontName = null;
 
 /**
  * Load a font from an ArrayBuffer (from file upload)
@@ -12,7 +13,8 @@ export function loadFontFromBuffer(buffer) {
     try {
       const font = opentype.parse(buffer);
       loadedFont = font;
-      console.log('Font loaded successfully:', font.names.fullName.en);
+      loadedFontName = font.names.fullName.en || 'Unknown Font';
+      console.log('Font loaded successfully:', loadedFontName);
       console.log('Font metrics:', {
         unitsPerEm: font.unitsPerEm,
         ascender: font.ascender,
@@ -27,11 +29,11 @@ export function loadFontFromBuffer(buffer) {
 }
 
 /**
- * Get the currently loaded font
- * @returns {Object|null} - opentype.js font object or null
+ * Get the name of the currently loaded font
+ * @returns {string|null}
  */
-export function getLoadedFont() {
-  return loadedFont;
+export function getLoadedFontName() {
+  return loadedFontName;
 }
 
 /**
@@ -47,6 +49,7 @@ export function hasFontLoaded() {
  */
 export function clearFont() {
   loadedFont = null;
+  loadedFontName = null;
 }
 
 /**
