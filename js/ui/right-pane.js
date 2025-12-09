@@ -22,6 +22,7 @@ import { expandMap } from '../map';
 import { exportImage } from '../export';
 import { loadFontFromBuffer } from '../fontLoader';
 import { exportAsSVG, downloadSVG } from '../vectorExport';
+import { generateFilenameWithSeed } from '../filenameGenerator';
 
 let pane;
 let paneContainer;
@@ -866,7 +867,7 @@ function setupActions() {
     title: '💾 Save as image'
   })
     .on('click', () => {
-      exportImage();
+      exportImage(currentSeedType);
     });
 
   actionsFolder.addSeparator();
@@ -916,7 +917,9 @@ function setupActions() {
       const brightness = parameterValues.rendering.brightness;
       const contrast = parameterValues.rendering.contrast;
       const svg = await exportAsSVG(threshold, brightness, contrast);
-      downloadSVG(svg, 'reaction-diffusion.svg');
+      
+      const filename = generateFilenameWithSeed('svg', currentSeedType);
+      downloadSVG(svg, filename);
 
       console.log('SVG exported successfully!');
 
