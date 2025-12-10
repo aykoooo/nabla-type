@@ -1,4 +1,5 @@
 import { loadFromCanvas } from 'potrace-wasm';
+import paper from 'paper/dist/paper-core';
 import { exportImage } from './export';
 
 /**
@@ -11,21 +12,21 @@ import { exportImage } from './export';
 export async function exportAsSVG(threshold = 128, brightness = 1.0, contrast = 1.0) {
   try {
     console.log('Capturing current canvas...');
-    
+
     // Get current canvas directly (no scaling)
     const canvas = captureCurrentCanvas();
 
     console.log('Applying adjustments...');
-    
+
     // Convert to grayscale
     let imageData = getImageData(canvas);
-    
+
     // Apply brightness/contrast if not default values
     if (brightness !== 1.0 || contrast !== 1.0) {
       console.log(`Applying brightness: ${brightness}, contrast: ${contrast}`);
       imageData = applyBrightnessContrast(imageData, brightness, contrast);
     }
-    
+
     // Apply threshold
     const binaryData = applyThreshold(imageData, threshold);
 
@@ -33,13 +34,16 @@ export async function exportAsSVG(threshold = 128, brightness = 1.0, contrast = 
     const binaryCanvas = createBinaryCanvas(binaryData, canvas.width, canvas.height);
 
     console.log('Running Potrace...');
-    
+
     // Convert to SVG using potrace-wasm's loadFromCanvas
-    const svg = await loadFromCanvas(binaryCanvas);
+    const rawSvg = await loadFromCanvas(binaryCanvas);
+
+    // Simplify the resulting SVG paths to reduce jagged edges / teeth
+    const simplifiedSvg = simplifySvg(rawSvg, 1.2);
 
     console.log('SVG generation complete');
-    
-    return svg;
+
+    return simplifiedSvg;
   } catch (error) {
     console.error('SVG export failed:', error);
     throw error;
@@ -52,15 +56,15 @@ export async function exportAsSVG(threshold = 128, brightness = 1.0, contrast = 
  */
 function captureCurrentCanvas() {
   const sourceCanvas = global.renderer.domElement;
-  
+
   // Create a copy of the canvas
   const canvas = document.createElement('canvas');
   canvas.width = sourceCanvas.width;
   canvas.height = sourceCanvas.height;
-  
+
   const ctx = canvas.getContext('2d');
   ctx.drawImage(sourceCanvas, 0, 0);
-  
+
   return canvas;
 }
 
@@ -149,10 +153,10 @@ function getImageData(canvas) {
 function applyBrightnessContrast(imageData, brightness, contrast) {
   const data = imageData.data;
   const adjusted = new Uint8ClampedArray(data.length);
-  
+
   // Convert brightness from 0-2 range to -128 to +128
   const brightnessOffset = (brightness - 1.0) * 128;
-  
+
   for (let i = 0; i < data.length; i += 4) {
     // Apply contrast and brightness to RGB channels
     for (let j = 0; j < 3; j++) {
@@ -167,7 +171,7 @@ function applyBrightnessContrast(imageData, brightness, contrast) {
     // Alpha channel unchanged
     adjusted[i + 3] = data[i + 3];
   }
-  
+
   return new ImageData(adjusted, imageData.width, imageData.height);
 }
 
@@ -210,6 +214,60 @@ function createBinaryCanvas(binaryData, width, height) {
   const imageData = new ImageData(binaryData, width, height);
   ctx.putImageData(imageData, 0, 0);
   return canvas;
+}
+
+/**
+ * Simplify SVG paths using Paper.js
+ * @param {string} svgContent
+ * @param {number} tolerance - higher = more aggressive simplification
+ * @returns {string}
+ */
+function simplifySvg(svgContent, tolerance = 0.4) {
+  try {
+    const scope = new paper.PaperScope();
+    // Minimal setup; view size will adjust to imported SVG
+    scope.setup(new scope.Size(1, 1));
+
+    const item = scope.project.importSVG(svgContent, { expandShapes: true });
+    if (!item) {
+      scope.project.clear();
+      return svgContent;
+    }
+
+    // Determine content bounds
+    const contentBounds = item.bounds || scope.project.activeLayer.bounds;
+    if (contentBounds) {
+      // Normalize to origin so exported viewBox matches content
+      item.translate(contentBounds.topLeft.multiply(-1));
+      scope.view.viewSize = contentBounds.size;
+    }
+
+    // Collect all path items (Path + CompoundPath)
+    const paths = item.getItems({
+      recursive: true,
+      match: (el) => el instanceof scope.PathItem
+    });
+
+    // Flatten curves then simplify to remove “teeth”
+    paths.forEach((p) => {
+      try {
+        if (p.flatten) p.flatten(tolerance);
+        if (p.simplify) p.simplify(tolerance);
+      } catch (e) {
+        // ignore individual path errors
+      }
+    });
+
+    const result = scope.project.exportSVG({
+      asString: true,
+      bounds: contentBounds || undefined
+    });
+    scope.project.clear();
+    return typeof result === 'string' ? result : svgContent;
+  } catch (err) {
+    console.warn('SVG simplification skipped:', err);
+    return svgContent;
+  }
 }
 
 /**
