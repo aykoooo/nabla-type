@@ -881,22 +881,6 @@ function setupActions() {
       openDrawingEditor();
     });
 
-  // REMOVED: Vector export settings - parameterValues.export doesn't exist
-  // actionsFolder.addInput(parameterValues.export, 'threshold', {
-  //   label: 'Export threshold',
-  //   min: 0,
-  //   max: 255,
-  //   step: 1
-  // });
-
-  // REMOVED: Duplicate save as image button
-  // actionsFolder.addButton({
-  //   title: 'Save as image (PNG)'
-  // })
-  //   .on('click', () => {
-  //     exportImage();
-  //   });
-
   // Export as SVG button
   const svgButton = actionsFolder.addButton({
     title: '� Export as SVG'
@@ -917,7 +901,6 @@ function setupActions() {
       const brightness = parameterValues.rendering.brightness;
       const contrast = parameterValues.rendering.contrast;
       const svg = await exportAsSVG(threshold, brightness, contrast);
-      
       const filename = generateFilenameWithSeed('svg', currentSeedType);
       downloadSVG(svg, filename);
 

@@ -222,7 +222,7 @@ function createBinaryCanvas(binaryData, width, height) {
  * @param {number} tolerance - higher = more aggressive simplification
  * @returns {string}
  */
-function simplifySvg(svgContent, tolerance = 0.4) {
+function simplifySvg(svgContent, tolerance = 0) {
   try {
     const scope = new paper.PaperScope();
     // Minimal setup; view size will adjust to imported SVG

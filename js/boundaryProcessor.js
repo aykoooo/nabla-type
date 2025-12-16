@@ -1,6 +1,6 @@
 /**
  * Boundary Processor Module
- * 
+ *
  * Generates boundary masks from seed canvas for constraining reaction-diffusion simulation.
  * Supports exact boundaries, padding (dilation), erosion, Gaussian blur (soft edges), and inversion.
  */
@@ -63,10 +63,10 @@ function createBinaryMask(imageData, width, height) {
         const r = pixels[i * 4];
         const g = pixels[i * 4 + 1];
         const b = pixels[i * 4 + 2];
-        
+
         // Calculate luminance (perceived brightness)
         const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-        
+
         // Dark pixels (< 128 out of 255) are inside boundary
         // This matches how seeds are drawn (black on white)
         mask[i] = luminance < 128 ? 1.0 : 0.0;
