@@ -1,6 +1,7 @@
 # ∇ Nabla Type: Reaction-Diffusion Font Generator
 
-> **⚠️ Work in Progress** - This is an experimental tool for generating fonts using reaction-diffusion simulations. Currently focused on implementing core functionality. UI/UX improvements will come later.
+> [!WARNING]
+> **Work in Progress** - This is an experimental tool for generating fonts using reaction-diffusion simulations. Currently focused on implementing core functionality. UI/UX improvements will come later.
 
 **Nabla Type** (named after the ∇ symbol, or "nabla", used in the reaction-diffusion equations) transforms any typeface into organic, living typography using GPU-accelerated pattern generation. Each glyph becomes a seed for beautiful, naturally-evolving patterns that can be exported as vector fonts.
 
