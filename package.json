@@ -1,0 +1,37 @@
+{
+  "name": "nabla-type",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reaction-diffusion typography playground built with Svelte, WebGL2, and VTracer.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "@tailwindcss/vite": "^4.2.1",
+    "@tsconfig/svelte": "^5.0.6",
+    "@types/node": "^24.10.1",
+    "@types/offscreencanvas": "^2019.7.3",
+    "daisyui": "^5.5.19",
+    "svelte": "^5.45.2",
+    "svelte-check": "^4.3.4",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0"
+  },
+  "dependencies": {
+    "d3-contour": "^4.0.2",
+    "opentype.js": "^1.3.4",
+    "regl": "^2.1.1",
+    "vtracer-webapp": "^0.4.0"
+  }
+}
