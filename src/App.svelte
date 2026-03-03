@@ -1,27 +1,70 @@
 <script lang="ts">
   import SimCanvas from "./components/SimCanvas.svelte";
   import ResizableCanvas from "./components/ResizableCanvas.svelte";
+  import PanZoomViewport from "./components/PanZoomViewport.svelte";
   import LayerStrip from "./components/LayerStrip.svelte";
   import InfoBar from "./components/InfoBar.svelte";
-  import ViewportToolbar from "./components/ViewportToolbar.svelte";
+
+  import TopControlBar from "./components/TopControlBar.svelte";
+  import LeftToolbar from "./components/LeftToolbar.svelte";
+  import BottomTimelineBar from "./components/BottomTimelineBar.svelte";
   import ParameterPanel from "./components/ParameterPanel.svelte";
   import SeedPanel from "./components/SeedPanel.svelte";
   import ColormapPicker from "./components/ColormapPicker.svelte";
   import ExportPanel from "./components/ExportPanel.svelte";
   import { GrayScott } from "$lib/simulation/GrayScott";
+  import { SeedGenerator } from "$lib/seed/SeedGenerator";
   import { store } from "$lib/store/simStore.svelte";
+  import { replay } from "$lib/store/replayStore.svelte";
+  import { simController } from "$lib/store/simController";
   import { onMount, onDestroy } from "svelte";
 
   let simCanvas: SimCanvas;
-  let activeTab = $state<"text" | "colors" | "export">("text");
 
   // Track resolution changes for resize
   let lastWidth = store.resolution.width;
   let lastHeight = store.resolution.height;
+  const seedGen = new SeedGenerator();
 
-  function handleReseed(font: any) {
-    if (font) {
-      simCanvas?.reseedWithFont(font);
+  function getAspectRatio(): number | null {
+    switch (store.aspectMode) {
+      case "1:1":
+        return 1;
+      case "4:3":
+        return 4 / 3;
+      case "16:9":
+        return 16 / 9;
+      default:
+        return null;
+    }
+  }
+
+  function applyAspect(
+    w: number,
+    h: number,
+    basis: "width" | "height" = "width",
+  ) {
+    const ratio = getAspectRatio();
+    if (!store.resolutionLocked || !ratio) {
+      return { width: Math.round(w), height: Math.round(h) };
+    }
+
+    if (basis === "height") {
+      return { width: Math.round(h * ratio), height: Math.round(h) };
+    }
+    return { width: Math.round(w), height: Math.round(w / ratio) };
+  }
+
+  function clampResolution(w: number, h: number) {
+    return {
+      width: Math.max(32, Math.min(8192, Math.round(w))),
+      height: Math.max(32, Math.min(8192, Math.round(h))),
+    };
+  }
+
+  function handleReseed() {
+    if (store.seedFont) {
+      simCanvas?.reseedWithFont(store.seedFont);
     } else {
       simCanvas?.reseed();
     }
@@ -31,11 +74,40 @@
     return simCanvas?.getSimulation() ?? null;
   }
 
+  function getCanvasElement(): HTMLCanvasElement | null {
+    return simCanvas?.getCanvasElement() ?? null;
+  }
+
   // Handle canvas resize from ResizableCanvas handles
   function handleCanvasResize(w: number, h: number) {
-    simCanvas?.resizeSimulation(w, h);
-    lastWidth = w;
-    lastHeight = h;
+    const adjusted = applyAspect(w, h);
+    const clamped = clampResolution(adjusted.width, adjusted.height);
+    simCanvas?.resizeSimulation(clamped.width, clamped.height);
+    lastWidth = clamped.width;
+    lastHeight = clamped.height;
+  }
+
+  function handleManualResolution(w: number, h: number) {
+    const adjusted = applyAspect(w, h);
+    handleCanvasResize(adjusted.width, adjusted.height);
+  }
+
+  function handleAspectMode(mode: "free" | "1:1" | "4:3" | "16:9") {
+    store.aspectMode = mode;
+    store.resolutionLocked = mode !== "free";
+    const current = applyAspect(
+      store.resolution.width,
+      store.resolution.height,
+    );
+    handleCanvasResize(current.width, current.height);
+  }
+
+  function handleResolutionLock(locked: boolean) {
+    store.resolutionLocked = locked;
+  }
+
+  function handleTargetFps(value: number) {
+    store.targetFps = Math.max(0, Math.min(240, Math.round(value)));
   }
 
   // Check for resolution changes from other sources (e.g. export panel)
@@ -53,52 +125,19 @@
     }
   });
 
-  // Viewport toolbar handlers
-  function handleMin() {
-    handleCanvasResize(64, 64);
-    store.resolution.width = 64;
-    store.resolution.height = 64;
+  // Viewport toolbar handlers handled by simController
+
+  function handleCanvasFocus() {
+    setTimeout(() => {
+      const input = document.getElementById(
+        "seed-text-input",
+      ) as HTMLInputElement | null;
+      input?.focus();
+      input?.select();
+    }, 0);
   }
 
-  function handleMax() {
-    // Use viewport-relative size
-    const w = Math.min(1024, Math.floor(window.innerWidth * 0.55));
-    const h = Math.min(1024, Math.floor(window.innerHeight * 0.65));
-    handleCanvasResize(w, h);
-    store.resolution.width = w;
-    store.resolution.height = h;
-  }
-
-  function handleSave() {
-    const sim = getSimulation();
-    if (!sim) return;
-    // Export current frame as PNG
-    const canvas = document.querySelector("canvas");
-    if (!canvas) return;
-    const url = canvas.toDataURL("image/png");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rd-frame-${Date.now()}.png`;
-    a.click();
-  }
-
-  function handlePause() {
-    store.isRunning = !store.isRunning;
-  }
-
-  function handleLoop() {
-    simCanvas?.reseed();
-  }
-
-  function handleTrash() {
-    const sim = getSimulation();
-    if (sim) {
-      sim.resize(store.resolution.width, store.resolution.height);
-      store.iterationCount = 0;
-    }
-  }
-
-  // Keyboard shortcuts
+  // Keyboard shortcuts handled centrally by svelte action or component, but for now we'll route it
   function handleKeyDown(e: KeyboardEvent) {
     // Don't trigger when typing in inputs
     const tag = (e.target as HTMLElement)?.tagName;
@@ -106,10 +145,10 @@
 
     if (e.code === "Space") {
       e.preventDefault();
-      handlePause();
+      simController.handlePause();
     } else if (e.code === "KeyR") {
       e.preventDefault();
-      handleLoop();
+      simController.handleLoop();
     }
   }
 
@@ -123,99 +162,84 @@
 </script>
 
 <div class="h-full flex flex-col bg-white overflow-hidden">
-  <!-- Header -->
-  <header class="flex items-center px-4 py-2 border-b border-black shrink-0">
-    <h1 class="text-lg font-black text-black tracking-tight">∇ Nabla Type</h1>
+  <!-- Header + TopControlBar -->
+  <header
+    class="flex items-center border-b border-black shrink-0 relative bg-white z-10 border-r"
+  >
+    <h1
+      class="text-sm font-black text-black tracking-tight px-4 py-2 border-r border-black shrink-0"
+    >
+      ∇ Nabla Type
+    </h1>
+    <TopControlBar />
   </header>
 
-  <!-- Main two-panel layout -->
+  <!-- Main layout -->
   <div class="flex flex-1 min-h-0 overflow-hidden">
-    <!-- LEFT PANEL: Viewport -->
-    <div class="flex-1 flex flex-col min-w-0 border-r border-black">
+    <!-- LEFT PANEL: Actions Toolbar -->
+    <LeftToolbar />
+
+    <!-- CENTER PANEL: Viewport + Timeline -->
+    <div
+      class="flex-1 flex flex-col min-w-0 border-r border-black relative bg-neutral-100"
+    >
       <!-- Canvas area with layer strip -->
-      <div class="flex flex-1 min-h-0 overflow-auto bg-neutral-100">
-        <!-- Scrollable canvas viewport -->
-        <div class="flex-1 grid place-items-center overflow-auto p-4">
+      <div class="flex flex-1 min-h-0 relative">
+        <PanZoomViewport>
           <ResizableCanvas
             bind:width={store.resolution.width}
             bind:height={store.resolution.height}
             onresize={handleCanvasResize}
           >
-            <SimCanvas bind:this={simCanvas} />
+            <SimCanvas
+              bind:this={simCanvas}
+              onCanvasClick={handleCanvasFocus}
+            />
           </ResizableCanvas>
-        </div>
-
-        <!-- Layer side-strip -->
+        </PanZoomViewport>
         <LayerStrip />
       </div>
 
       <!-- Info bar -->
-      <div class="border-t border-base-300 shrink-0">
+      <div class="shrink-0 bg-white border-t border-black">
         <InfoBar />
       </div>
 
-      <!-- Viewport toolbars -->
-      <div class="border-t border-base-300 shrink-0">
-        <ViewportToolbar
-          onmin={handleMin}
-          onmax={handleMax}
-          onsave={handleSave}
-          onpause={handlePause}
-          onloop={handleLoop}
-          ontrash={handleTrash}
-        />
+      <!-- Bottom Timeline -->
+      <div class="shrink-0 bg-white">
+        <BottomTimelineBar />
       </div>
     </div>
 
-    <!-- RIGHT PANEL: Parameters + Tabs -->
-    <div class="w-80 flex flex-col shrink-0 bg-white">
-      <!-- Diffusion Parameters -->
-      <div class="flex-1 min-h-0 overflow-y-auto p-3">
-        <ParameterPanel />
-      </div>
+    <!-- RIGHT PANEL: Properties (Stacked) -->
+    <div class="w-80 flex flex-col shrink-0 bg-white overflow-y-auto">
+      <div class="p-3 flex flex-col gap-4">
+        <!-- Seed panel (Text input) -->
+        <SeedPanel onReseed={handleReseed} />
 
-      <!-- Tab content area -->
-      <div class="border-t border-black">
-        <!-- Tabs -->
-        <div class="flex border-b border-black">
-          <button
-            class="flex-1 px-3 py-1.5 text-xs font-bold uppercase tracking-wide border-r border-black {activeTab ===
-            'text'
-              ? 'bg-black text-white'
-              : 'bg-white text-black hover:bg-neutral-100'}"
-            onclick={() => (activeTab = "text")}
-          >
-            Text
-          </button>
-          <button
-            class="flex-1 px-3 py-1.5 text-xs font-bold uppercase tracking-wide border-r border-black {activeTab ===
-            'colors'
-              ? 'bg-black text-white'
-              : 'bg-white text-black hover:bg-neutral-100'}"
-            onclick={() => (activeTab = "colors")}
-          >
+        <div class="w-full h-px bg-black/20"></div>
+
+        <!-- Colormap settings -->
+        <div class="flex flex-col gap-2">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-black">
             Colors
-          </button>
-          <button
-            class="flex-1 px-3 py-1.5 text-xs font-bold uppercase tracking-wide {activeTab ===
-            'export'
-              ? 'bg-black text-white'
-              : 'bg-white text-black hover:bg-neutral-100'}"
-            onclick={() => (activeTab = "export")}
-          >
-            Export
-          </button>
+          </h3>
+          <ColormapPicker />
         </div>
 
-        <!-- Tab content -->
-        <div class="max-h-48 overflow-y-auto">
-          {#if activeTab === "text"}
-            <SeedPanel onReseed={handleReseed} />
-          {:else if activeTab === "colors"}
-            <ColormapPicker />
-          {:else if activeTab === "export"}
-            <ExportPanel {getSimulation} />
-          {/if}
+        <div class="w-full h-px bg-black/20"></div>
+
+        <!-- Diffusion Parameters -->
+        <ParameterPanel />
+
+        <div class="w-full h-px bg-black/20"></div>
+
+        <!-- Exporter -->
+        <div class="flex flex-col gap-2 mb-8">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-black">
+            Export
+          </h3>
+          <ExportPanel {getSimulation} {getCanvasElement} />
         </div>
       </div>
     </div>

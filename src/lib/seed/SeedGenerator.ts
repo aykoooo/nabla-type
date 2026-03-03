@@ -1,4 +1,33 @@
 export class SeedGenerator {
+    measureTextBounds(
+        text: string,
+        font: any | null,
+        fontSize: number,
+        padding: number = 24
+    ): { width: number; height: number } {
+        if (font && font.getPath) {
+            const path = font.getPath(text || 'A', 0, 0, fontSize)
+            const bbox = path.getBoundingBox()
+            const width = Math.max(1, Math.ceil((bbox.x2 - bbox.x1) + padding * 2))
+            const height = Math.max(1, Math.ceil((bbox.y2 - bbox.y1) + padding * 2))
+            return { width, height }
+        }
+
+        const canvas = new OffscreenCanvas(1, 1)
+        const ctx = canvas.getContext('2d')!
+        ctx.font = `bold ${fontSize}px sans-serif`
+        const metrics = ctx.measureText(text || 'A')
+        const textWidth = metrics.width
+        const textHeight =
+            (metrics.actualBoundingBoxAscent || fontSize * 0.8) +
+            (metrics.actualBoundingBoxDescent || fontSize * 0.2)
+
+        return {
+            width: Math.max(1, Math.ceil(textWidth + padding * 2)),
+            height: Math.max(1, Math.ceil(textHeight + padding * 2)),
+        }
+    }
+
     /**
      * Renders text to an offscreen Canvas 2D at simulation resolution.
      * Returns ImageData where black pixels = seeded, white = empty.

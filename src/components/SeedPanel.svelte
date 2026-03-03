@@ -2,13 +2,13 @@
   import { store } from "$lib/store/simStore.svelte";
   import { FontLoader } from "$lib/seed/FontLoader";
 
-  let { onReseed }: { onReseed: (font: any) => void } = $props();
+  let { onReseed }: { onReseed: () => void } = $props();
 
   let fontLoader = new FontLoader();
-  let fontName = $state("");
+  let autoApplyTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleApply() {
-    onReseed(fontLoader.getFont());
+    onReseed();
   }
 
   async function handleFontUpload(e: Event) {
@@ -16,19 +16,40 @@
     const file = input.files?.[0];
     if (!file) return;
     try {
-      await fontLoader.loadFromFile(file);
-      fontName = file.name;
-      onReseed(fontLoader.getFont());
+      const font = await fontLoader.loadFromFile(file);
+      store.seedFont = font;
+      store.seedFontName = file.name;
+      onReseed();
     } catch (err) {
       console.error("Failed to load font:", err);
-      fontName = "(error)";
+      store.seedFontName = "(error)";
     }
   }
 
   function clearFont() {
+    store.seedFont = null;
+    store.seedFontName = "";
     fontLoader.clear();
-    fontName = "";
+    onReseed();
   }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleApply();
+    }
+  }
+
+  $effect(() => {
+    store.seedFontSize;
+    if (autoApplyTimer) clearTimeout(autoApplyTimer);
+    autoApplyTimer = setTimeout(() => {
+      onReseed();
+    }, 160);
+    return () => {
+      if (autoApplyTimer) clearTimeout(autoApplyTimer);
+    };
+  });
 </script>
 
 <div class="flex flex-col gap-3 p-3 border-t border-black">
@@ -38,12 +59,15 @@
 
   <div class="flex gap-2 items-center">
     <input
+      id="seed-text-input"
       type="text"
       class="border border-black px-2 py-1 text-xs bg-white flex-1"
       bind:value={store.seedText}
       placeholder="Type text…"
+      onkeydown={handleKeyDown}
     />
     <button
+      type="button"
       class="border border-black bg-black text-white px-3 py-1 text-xs font-bold uppercase"
       onclick={handleApply}>Apply</button
     >
@@ -71,7 +95,7 @@
     <label
       class="border border-black px-2 py-1 text-xs bg-white flex-1 cursor-pointer hover:bg-base-200 truncate text-center"
     >
-      {fontName || "Upload font (.ttf/.otf)"}
+      {store.seedFontName || "Upload font (.ttf/.otf)"}
       <input
         type="file"
         accept=".ttf,.otf,.woff,.woff2"
@@ -79,8 +103,9 @@
         hidden
       />
     </label>
-    {#if fontName}
+    {#if store.seedFontName}
       <button
+        type="button"
         class="border border-black px-2 py-1 text-xs text-red-600 hover:bg-red-600 hover:text-white"
         onclick={clearFont}>✕</button
       >

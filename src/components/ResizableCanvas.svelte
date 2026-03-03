@@ -29,7 +29,7 @@
     const MIN_SIZE = 64;
 
     function handleStyle(handle: string): string {
-        const S = 8;
+        const S = 18;
         const H = S / 2;
         switch (handle) {
             case "nw":
@@ -41,13 +41,13 @@
             case "se":
                 return `width:${S}px; height:${S}px; bottom:-${H}px; right:-${H}px;`;
             case "n":
-                return `height:${S}px; top:-${H}px; left:${S}px; right:${S}px;`;
+                return `height:${S}px; top:-${H}px; left:24px; right:24px;`;
             case "s":
-                return `height:${S}px; bottom:-${H}px; left:${S}px; right:${S}px;`;
+                return `height:${S}px; bottom:-${H}px; left:24px; right:24px;`;
             case "w":
-                return `width:${S}px; left:-${H}px; top:${S}px; bottom:${S}px;`;
+                return `width:${S}px; left:-${H}px; top:24px; bottom:24px;`;
             case "e":
-                return `width:${S}px; right:-${H}px; top:${S}px; bottom:${S}px;`;
+                return `width:${S}px; right:-${H}px; top:24px; bottom:24px;`;
             default:
                 return "";
         }
@@ -91,10 +91,14 @@
         let newW = startW;
         let newH = startH;
 
-        if (activeHandle.includes("e")) newW = Math.max(MIN_SIZE, startW + dx);
-        if (activeHandle.includes("w")) newW = Math.max(MIN_SIZE, startW - dx);
-        if (activeHandle.includes("s")) newH = Math.max(MIN_SIZE, startH + dy);
-        if (activeHandle.includes("n")) newH = Math.max(MIN_SIZE, startH - dy);
+        if (activeHandle.includes("e"))
+            newW = Math.max(MIN_SIZE, startW + dx * 2);
+        if (activeHandle.includes("w"))
+            newW = Math.max(MIN_SIZE, startW - dx * 2);
+        if (activeHandle.includes("s"))
+            newH = Math.max(MIN_SIZE, startH + dy * 2);
+        if (activeHandle.includes("n"))
+            newH = Math.max(MIN_SIZE, startH - dy * 2);
 
         previewW = newW;
         previewH = newH;
@@ -113,9 +117,16 @@
     }
 
     const handles = ["n", "s", "e", "w", "nw", "ne", "sw", "se"] as const;
+
+    function isCornerHandle(handle: string): boolean {
+        return handle.length === 2;
+    }
 </script>
 
-<div class="relative inline-block" bind:this={containerEl}>
+<div
+    class="relative inline-block flex items-center justify-center"
+    bind:this={containerEl}
+>
     <!--
     MS Paint style: During drag, the wrapper expands to previewW x previewH
     but the canvas inside stays at its original pixel size (width x height).
@@ -124,7 +135,7 @@
     resizes the simulation.
   -->
     <div
-        class="relative bg-white"
+        class="relative bg-white flex items-center justify-center"
         style="width: {dragging ? previewW : width}px; height: {dragging
             ? previewH
             : height}px;"
@@ -132,24 +143,61 @@
         {@render children()}
     </div>
 
-    <!-- Resize handles: flat black squares -->
+    <!-- Resize handles: MS Paint style thin line markers with larger invisible hit areas -->
     {#each handles as handle}
         <button
             type="button"
-            class="absolute bg-white border border-black z-20 hover:bg-black {cursorClass(
+            class="absolute z-20 bg-transparent border-0 p-0 transition-colors {cursorClass(
                 handle,
-            )}"
-            style={handleStyle(handle)}
+            )} {activeHandle === handle
+                ? 'text-black'
+                : 'text-neutral-500 hover:text-black'}"
+            style="{handleStyle(
+                handle,
+            )}; filter: drop-shadow(0px 0px 1px rgba(255,255,255,0.8));"
             onmousedown={(e) => onHandleDown(e, handle)}
             aria-label={`Resize ${handle}`}
-        ></button>
+        >
+            {#if handle === "n" || handle === "s"}
+                <span
+                    class="pointer-events-none absolute left-1/2 -translate-x-1/2 w-5 h-px bg-current"
+                    style={handle === "n" ? "top: 2px;" : "bottom: 2px;"}
+                ></span>
+            {:else if handle === "e" || handle === "w"}
+                <span
+                    class="pointer-events-none absolute top-1/2 -translate-y-1/2 w-px h-5 bg-current"
+                    style={handle === "w" ? "left: 2px;" : "right: 2px;"}
+                ></span>
+            {:else if isCornerHandle(handle)}
+                <span
+                    class="pointer-events-none absolute w-4 h-px bg-current"
+                    style={handle === "nw"
+                        ? "top: 2px; left: 2px;"
+                        : handle === "ne"
+                          ? "top: 2px; right: 2px;"
+                          : handle === "sw"
+                            ? "bottom: 2px; left: 2px;"
+                            : "bottom: 2px; right: 2px;"}
+                ></span>
+                <span
+                    class="pointer-events-none absolute w-px h-4 bg-current"
+                    style={handle === "nw"
+                        ? "top: 2px; left: 2px;"
+                        : handle === "ne"
+                          ? "top: 2px; right: 2px;"
+                          : handle === "sw"
+                            ? "bottom: 2px; left: 2px;"
+                            : "bottom: 2px; right: 2px;"}
+                ></span>
+            {/if}
+        </button>
     {/each}
 
     <!-- Preview outline during drag: black dashed border -->
     {#if dragging}
         <div
             class="absolute border border-dashed border-black pointer-events-none z-10"
-            style="width: {previewW}px; height: {previewH}px; top: 0; left: 0;"
+            style="width: {previewW}px; height: {previewH}px; top: 0; left: 0; outline: 1px dashed white;"
         ></div>
         <div
             class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white border border-black px-2 py-0.5 text-[10px] font-mono font-bold z-30 whitespace-nowrap"

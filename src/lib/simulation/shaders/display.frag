@@ -13,8 +13,9 @@ void main() {
   if (u_useLUT) {
     color = texture2D(u_colormap, vec2(b, 0.5)).rgb;
   } else {
-    // Black-and-white: B < 0.5 → white, B >= 0.5 → black
-    float bw = 1.0 - step(0.5, b);
+    // Black-and-white: use smoothstep for anti-aliasing instead of a harsh step.
+    // The simulation state remains deterministic, only the visual thresholding is smoothed.
+    float bw = 1.0 - smoothstep(0.02, 0.08, b);
     color = vec3(bw);
   }
 

@@ -2,7 +2,7 @@
 
 An experimental reaction-diffusion typography tool.
 
-Type text, seed a Gray-Scott simulation from glyph masks, evolve it on the GPU (WebGL2), and export results as SVG using VTracer in a worker.
+Type text, seed a Gray-Scott simulation from glyph masks, evolve it on the GPU (WebGL1), and export results as SVG or PNG.
 
 ## Current status
 

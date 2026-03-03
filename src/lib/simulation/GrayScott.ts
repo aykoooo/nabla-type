@@ -142,7 +142,7 @@ export class GrayScott {
         })
     }
 
-    private clearState(): void {
+    public clearState(): void {
         // Initialize: A=1, B=0 everywhere
         const data = new Float32Array(this.width * this.height * 4)
         for (let i = 0; i < this.width * this.height; i++) {
@@ -218,7 +218,8 @@ export class GrayScott {
      * Step the simulation N times per call
      */
     step(params: SimParams): void {
-        for (let i = 0; i < params.stepsPerFrame; i++) {
+        const steps = Math.max(1, Math.min(16, Math.round(params.stepsPerFrame)))
+        for (let i = 0; i < steps; i++) {
             const src = this.ping ? this.pingFBO : this.pongFBO
             const dst = this.ping ? this.pongFBO : this.pingFBO
 
@@ -287,13 +288,19 @@ export class GrayScott {
         this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false })
         this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false })
 
-        // Build new data: copy old pixels into top-left, fill rest with A=1, B=0
+        // Build new data: copy old pixels into the center, fill rest with A=1, B=0
         const newData = new Float32Array(width * height * 4)
+        const offsetX = Math.floor((width - oldW) / 2)
+        const offsetY = Math.floor((height - oldH) / 2)
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const ni = (y * width + x) * 4
-                if (x < oldW && y < oldH) {
-                    const oi = (y * oldW + x) * 4
+                const oldX = x - offsetX
+                const oldY = y - offsetY
+
+                if (oldX >= 0 && oldX < oldW && oldY >= 0 && oldY < oldH) {
+                    const oi = (oldY * oldW + oldX) * 4
                     newData[ni + 0] = oldData[oi + 0]
                     newData[ni + 1] = oldData[oi + 1]
                     newData[ni + 2] = oldData[oi + 2]
@@ -344,6 +351,25 @@ export class GrayScott {
             pixels[i] = Math.round(Math.min(1, Math.max(0, floatPixels[i])) * 255)
         }
         return pixels
+    }
+
+    /**
+     * Read current simulation state as float texture data.
+     */
+    readStateFloat(): Float32Array {
+        const current = this.ping ? this.pingFBO : this.pongFBO
+        const state = new Float32Array(this.width * this.height * 4)
+        current.use(() => {
+            this.regl.read({ data: state })
+        })
+        return state
+    }
+
+    /**
+     * Replace current simulation state from float texture data.
+     */
+    writeStateFloat(data: Float32Array): void {
+        this.injectSeedFloat(data)
     }
 
     getWidth(): number {

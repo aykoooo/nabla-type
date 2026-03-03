@@ -3,10 +3,27 @@
   import { GrayScott } from "$lib/simulation/GrayScott";
   import { contours } from "d3-contour";
 
-  let { getSimulation }: { getSimulation: () => GrayScott | null } = $props();
+  let {
+    getSimulation,
+    getCanvasElement,
+  }: {
+    getSimulation: () => GrayScott | null;
+    getCanvasElement?: () => HTMLCanvasElement | null;
+  } = $props();
 
   let exporting = $state(false);
   let exportStatus = $state("");
+  let exportPadding = $state(12);
+  let pngScale = $state(1);
+  let pngWidth = $state(store.resolution.width);
+  let pngHeight = $state(store.resolution.height);
+
+  $effect(() => {
+    store.resolution.width;
+    store.resolution.height;
+    pngWidth = Math.max(1, Math.round(store.resolution.width * pngScale));
+    pngHeight = Math.max(1, Math.round(store.resolution.height * pngScale));
+  });
 
   function geoToSvgPath(geometry: any): string {
     let d = "";
@@ -40,8 +57,12 @@
       exportStatus = "Generating contours…";
 
       const bChannel = new Float64Array(width * height);
-      for (let i = 0; i < width * height; i++) {
-        bChannel[i] = pixels[i * 4 + 1] / 255;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const dst = y * width + x;
+          const src = ((height - 1 - y) * width + x) * 4;
+          bChannel[dst] = pixels[src + 1] / 255;
+        }
       }
 
       const contourGenerator = contours()
@@ -55,12 +76,15 @@
       for (const c of contourData) {
         const d = geoToSvgPath(c);
         if (d) {
-          paths += `<path d="${d}" fill="#000" stroke="none"/>`;
+          paths += `<g transform="translate(${exportPadding} ${exportPadding})"><path d="${d}" fill="#000" stroke="none"/></g>`;
         }
       }
 
-      const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-<rect width="${width}" height="${height}" fill="#fff"/>
+      const outW = width + exportPadding * 2;
+      const outH = height + exportPadding * 2;
+
+      const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${outW} ${outH}" width="${outW}" height="${outH}">
+<rect width="${outW}" height="${outH}" fill="#fff"/>
 ${paths}
 </svg>`;
 
@@ -98,10 +122,42 @@ ${paths}
     exportStatus = "Generating PNG…";
 
     try {
-      const canvas = document.querySelector("canvas");
-      if (!canvas) throw new Error("Canvas not found");
+      const sim = getSimulation();
+      if (!sim) throw new Error("Simulation not found");
 
-      const url = canvas.toDataURL("image/png");
+      const srcW = sim.getWidth();
+      const srcH = sim.getHeight();
+      const outW = Math.max(1, Math.round(pngWidth));
+      const outH = Math.max(1, Math.round(pngHeight));
+
+      const pixels = sim.readPixels();
+      const rgba = new Uint8ClampedArray(srcW * srcH * 4);
+      for (let y = 0; y < srcH; y++) {
+        for (let x = 0; x < srcW; x++) {
+          const dst = (y * srcW + x) * 4;
+          const src = ((srcH - 1 - y) * srcW + x) * 4;
+          rgba[dst + 0] = pixels[src + 0];
+          rgba[dst + 1] = pixels[src + 1];
+          rgba[dst + 2] = pixels[src + 2];
+          rgba[dst + 3] = 255;
+        }
+      }
+
+      const sourceCanvas = new OffscreenCanvas(srcW, srcH);
+      const sourceCtx = sourceCanvas.getContext("2d");
+      if (!sourceCtx) throw new Error("2D context unavailable");
+      sourceCtx.putImageData(new ImageData(rgba, srcW, srcH), 0, 0);
+
+      const outCanvas = new OffscreenCanvas(outW, outH);
+      const outCtx = outCanvas.getContext("2d");
+      if (!outCtx) throw new Error("Output context unavailable");
+      outCtx.imageSmoothingEnabled = false;
+      outCtx.fillStyle = "#ffffff";
+      outCtx.fillRect(0, 0, outW, outH);
+      outCtx.drawImage(sourceCanvas as any, 0, 0, outW, outH);
+
+      const blob = await outCanvas.convertToBlob({ type: "image/png" });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `rd-type-${Date.now()}.png`;
@@ -109,6 +165,7 @@ ${paths}
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
       exportStatus = "Done!";
       setTimeout(() => {
@@ -132,6 +189,57 @@ ${paths}
   <p class="text-xs text-black/70">
     Canvas: {store.resolution.width}×{store.resolution.height}
   </p>
+
+  <div class="grid grid-cols-2 gap-2 text-xs">
+    <label class="flex flex-col gap-1">
+      <span>Padding</span>
+      <input
+        type="number"
+        min="0"
+        max="128"
+        bind:value={exportPadding}
+        class="border border-black px-2 py-1"
+      />
+    </label>
+    <label class="flex flex-col gap-1">
+      <span>PNG Scale</span>
+      <select
+        class="border border-black px-2 py-1"
+        bind:value={pngScale}
+        onchange={() => {
+          pngWidth = Math.max(1, Math.round(store.resolution.width * pngScale));
+          pngHeight = Math.max(
+            1,
+            Math.round(store.resolution.height * pngScale),
+          );
+        }}
+      >
+        <option value={1}>1x</option>
+        <option value={2}>2x</option>
+        <option value={4}>4x</option>
+      </select>
+    </label>
+    <label class="flex flex-col gap-1">
+      <span>PNG Width</span>
+      <input
+        type="number"
+        min="1"
+        max="8192"
+        bind:value={pngWidth}
+        class="border border-black px-2 py-1"
+      />
+    </label>
+    <label class="flex flex-col gap-1">
+      <span>PNG Height</span>
+      <input
+        type="number"
+        min="1"
+        max="8192"
+        bind:value={pngHeight}
+        class="border border-black px-2 py-1"
+      />
+    </label>
+  </div>
 
   <div class="flex gap-2">
     <button

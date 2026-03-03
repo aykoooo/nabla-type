@@ -1,14 +1,24 @@
 <script lang="ts">
   import { store } from "$lib/store/simStore.svelte";
-  import { PRESETS, PRESET_NAMES } from "$lib/simulation/presets";
+  import { onMount } from "svelte";
   import PearsonMap from "./PearsonMap.svelte";
+  import {
+    cloneParams,
+    getAllPresetNames,
+    getPresetByName,
+    loadUserPresets,
+    paramsEqualRounded,
+    saveUserPreset,
+  } from "$lib/store/presetStore";
 
   let pearsonOpen = $state(false);
+  let savePresetName = $state("");
+  let sectionOpen = $state({ presets: true, core: true, timing: true });
 
-  function applyPreset(e: Event) {
-    const select = e.target as HTMLSelectElement;
-    const name = select.value;
-    const preset = PRESETS[name];
+  const presetNames = $derived(getAllPresetNames(store.userPresets));
+
+  function applyPresetByName(name: string) {
+    const preset = getPresetByName(name, store.userPresets);
     if (!preset) return;
     store.activePreset = name;
     store.params.feed = preset.feed;
@@ -17,27 +27,59 @@
     store.params.db = preset.db;
     store.params.dt = preset.dt;
     store.params.stepsPerFrame = preset.stepsPerFrame;
+    store.baselineParams = cloneParams(preset);
   }
 
-  // Ensure slider values stay numeric (input type="range" can return strings)
-  function setFeed(e: Event) {
-    store.params.feed = Number((e.target as HTMLInputElement).value);
+  function applyPreset(e: Event) {
+    const select = e.target as HTMLSelectElement;
+    applyPresetByName(select.value);
   }
-  function setKill(e: Event) {
-    store.params.kill = Number((e.target as HTMLInputElement).value);
+
+  function cyclePreset(direction: -1 | 1) {
+    if (presetNames.length === 0) return;
+    const idx = presetNames.indexOf(store.activePreset);
+    const start = idx >= 0 ? idx : 0;
+    const next = (start + direction + presetNames.length) % presetNames.length;
+    applyPresetByName(presetNames[next]);
   }
-  function setDa(e: Event) {
-    store.params.da = Number((e.target as HTMLInputElement).value);
+
+  function setParam(name: keyof typeof store.params, e: Event) {
+    const raw = Number((e.target as HTMLInputElement).value);
+    if (name === "stepsPerFrame") {
+      store.params.stepsPerFrame = Math.max(1, Math.min(16, Math.round(raw)));
+      return;
+    }
+    store.params[name] = raw;
   }
-  function setDb(e: Event) {
-    store.params.db = Number((e.target as HTMLInputElement).value);
+
+  function saveCurrentPreset() {
+    const presetName = savePresetName.trim();
+    if (!presetName) return;
+    store.userPresets = saveUserPreset(
+      presetName,
+      store.params,
+      store.userPresets,
+    );
+    applyPresetByName(presetName);
+    savePresetName = "";
   }
-  function setDt(e: Event) {
-    store.params.dt = Number((e.target as HTMLInputElement).value);
+
+  function resetToBaseline() {
+    applyPresetByName(store.activePreset);
   }
-  function setSteps(e: Event) {
-    store.params.stepsPerFrame = Number((e.target as HTMLInputElement).value);
+
+  function toggleSection(section: keyof typeof sectionOpen) {
+    sectionOpen[section] = !sectionOpen[section];
   }
+
+  const paramsDirty = $derived(
+    !paramsEqualRounded(store.params, store.baselineParams),
+  );
+
+  onMount(() => {
+    store.userPresets = loadUserPresets();
+    applyPresetByName(store.activePreset);
+  });
 </script>
 
 <div class="flex flex-col gap-3 h-full">
@@ -46,136 +88,224 @@
   </h3>
 
   <!-- Presets -->
-  <div class="flex flex-col gap-1">
-    <span class="text-xs font-bold uppercase tracking-wide text-black/50"
-      >Presets</span
+  <div class="border border-black">
+    <button
+      type="button"
+      class="w-full text-left px-2 py-1 text-xs font-bold uppercase tracking-wide bg-neutral-50 border-b border-black"
+      onclick={() => toggleSection("presets")}
     >
-    <select
-      class="border border-black px-2 py-1 text-xs bg-white w-full"
-      value={store.activePreset}
-      onchange={applyPreset}
-    >
-      {#each PRESET_NAMES as name}
-        <option value={name}>{name}</option>
-      {/each}
-    </select>
+      Presets {sectionOpen.presets ? "−" : "+"}
+    </button>
+    {#if sectionOpen.presets}
+      <div class="p-2 flex flex-col gap-2">
+        <div class="flex gap-1">
+          <button
+            type="button"
+            class="border border-black px-2 py-1 text-xs font-bold hover:bg-black hover:text-white"
+            onclick={() => cyclePreset(-1)}
+          >
+            &lt;
+          </button>
+          <select
+            class="border border-black px-2 py-1 text-xs bg-white w-full"
+            value={store.activePreset}
+            onchange={applyPreset}
+          >
+            {#each presetNames as name}
+              <option value={name}>{name}</option>
+            {/each}
+          </select>
+          <button
+            type="button"
+            class="border border-black px-2 py-1 text-xs font-bold hover:bg-black hover:text-white"
+            onclick={() => cyclePreset(1)}
+          >
+            &gt;
+          </button>
+        </div>
+
+        <div class="flex gap-1">
+          <input
+            class="border border-black px-2 py-1 text-xs w-full"
+            placeholder="New preset name"
+            bind:value={savePresetName}
+            onkeydown={(e) => e.key === "Enter" && saveCurrentPreset()}
+          />
+          <button
+            type="button"
+            class="border border-black bg-black text-white px-2 py-1 text-xs font-bold uppercase"
+            onclick={saveCurrentPreset}
+          >
+            Save
+          </button>
+        </div>
+
+        {#if paramsDirty}
+          <button
+            type="button"
+            class="border border-black bg-white text-black px-2 py-1 text-xs font-bold uppercase hover:bg-black hover:text-white"
+            onclick={resetToBaseline}
+          >
+            Reset params
+          </button>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <!-- Params -->
-  <div class="flex-1 overflow-y-auto flex flex-col gap-2 pr-1">
-    <div class="flex flex-col gap-0.5">
-      <label
-        class="text-xs text-black/60 flex justify-between"
-        for="feed-slider"
-      >
-        Feed <span class="font-mono text-black"
-          >{store.params.feed.toFixed(4)}</span
-        >
-      </label>
-      <input
-        id="feed-slider"
-        type="range"
-        class="range range-xs"
-        min="0.001"
-        max="0.1"
-        step="0.0001"
-        value={store.params.feed}
-        oninput={setFeed}
-      />
-    </div>
+  <div class="border border-black">
+    <button
+      type="button"
+      class="w-full text-left px-2 py-1 text-xs font-bold uppercase tracking-wide bg-neutral-50 border-b border-black"
+      onclick={() => toggleSection("core")}
+    >
+      Diffusion {sectionOpen.core ? "−" : "+"}
+    </button>
+    {#if sectionOpen.core}
+      <div class="p-2 flex flex-col gap-2">
+        <div class="flex flex-col gap-0.5">
+          <label
+            class="text-xs text-black/60 flex justify-between"
+            for="feed-slider"
+          >
+            Feed <span class="font-mono text-black"
+              >{store.params.feed.toFixed(4)}</span
+            >
+          </label>
+          <input
+            id="feed-slider"
+            type="range"
+            class="range range-xs"
+            min="0.001"
+            max="0.1"
+            step="0.0001"
+            value={store.params.feed}
+            oninput={(e) => setParam("feed", e)}
+          />
+        </div>
 
-    <div class="flex flex-col gap-0.5">
-      <label
-        class="text-xs text-black/60 flex justify-between"
-        for="kill-slider"
-      >
-        Kill <span class="font-mono text-black"
-          >{store.params.kill.toFixed(4)}</span
-        >
-      </label>
-      <input
-        id="kill-slider"
-        type="range"
-        class="range range-xs"
-        min="0.001"
-        max="0.1"
-        step="0.0001"
-        value={store.params.kill}
-        oninput={setKill}
-      />
-    </div>
+        <div class="flex flex-col gap-0.5">
+          <label
+            class="text-xs text-black/60 flex justify-between"
+            for="kill-slider"
+          >
+            Kill <span class="font-mono text-black"
+              >{store.params.kill.toFixed(4)}</span
+            >
+          </label>
+          <input
+            id="kill-slider"
+            type="range"
+            class="range range-xs"
+            min="0.001"
+            max="0.1"
+            step="0.0001"
+            value={store.params.kill}
+            oninput={(e) => setParam("kill", e)}
+          />
+        </div>
 
-    <div class="flex flex-col gap-0.5">
-      <label class="text-xs text-black/60 flex justify-between" for="da-slider">
-        D<sub>a</sub>
-        <span class="font-mono text-black">{store.params.da.toFixed(2)}</span>
-      </label>
-      <input
-        id="da-slider"
-        type="range"
-        class="range range-xs"
-        min="0.1"
-        max="2.0"
-        step="0.01"
-        value={store.params.da}
-        oninput={setDa}
-      />
-    </div>
+        <div class="flex flex-col gap-0.5">
+          <label
+            class="text-xs text-black/60 flex justify-between"
+            for="da-slider"
+          >
+            D<sub>a</sub>
+            <span class="font-mono text-black"
+              >{store.params.da.toFixed(2)}</span
+            >
+          </label>
+          <input
+            id="da-slider"
+            type="range"
+            class="range range-xs"
+            min="0.1"
+            max="2.0"
+            step="0.01"
+            value={store.params.da}
+            oninput={(e) => setParam("da", e)}
+          />
+        </div>
 
-    <div class="flex flex-col gap-0.5">
-      <label class="text-xs text-black/60 flex justify-between" for="db-slider">
-        D<sub>b</sub>
-        <span class="font-mono text-black">{store.params.db.toFixed(2)}</span>
-      </label>
-      <input
-        id="db-slider"
-        type="range"
-        class="range range-xs"
-        min="0.1"
-        max="2.0"
-        step="0.01"
-        value={store.params.db}
-        oninput={setDb}
-      />
-    </div>
+        <div class="flex flex-col gap-0.5">
+          <label
+            class="text-xs text-black/60 flex justify-between"
+            for="db-slider"
+          >
+            D<sub>b</sub>
+            <span class="font-mono text-black"
+              >{store.params.db.toFixed(2)}</span
+            >
+          </label>
+          <input
+            id="db-slider"
+            type="range"
+            class="range range-xs"
+            min="0.1"
+            max="2.0"
+            step="0.01"
+            value={store.params.db}
+            oninput={(e) => setParam("db", e)}
+          />
+        </div>
 
-    <div class="flex flex-col gap-0.5">
-      <label class="text-xs text-black/60 flex justify-between" for="dt-slider">
-        dt <span class="font-mono text-black">{store.params.dt.toFixed(2)}</span
-        >
-      </label>
-      <input
-        id="dt-slider"
-        type="range"
-        class="range range-xs"
-        min="0.1"
-        max="2.0"
-        step="0.01"
-        value={store.params.dt}
-        oninput={setDt}
-      />
-    </div>
+        <div class="flex flex-col gap-0.5">
+          <label
+            class="text-xs text-black/60 flex justify-between"
+            for="dt-slider"
+          >
+            dt <span class="font-mono text-black"
+              >{store.params.dt.toFixed(2)}</span
+            >
+          </label>
+          <input
+            id="dt-slider"
+            type="range"
+            class="range range-xs"
+            min="0.1"
+            max="2.0"
+            step="0.01"
+            value={store.params.dt}
+            oninput={(e) => setParam("dt", e)}
+          />
+        </div>
+      </div>
+    {/if}
+  </div>
 
-    <div class="flex flex-col gap-0.5">
-      <label
-        class="text-xs text-black/60 flex justify-between"
-        for="steps-slider"
-      >
-        Steps/Frame <span class="font-mono text-black"
-          >{store.params.stepsPerFrame}</span
-        >
-      </label>
-      <input
-        id="steps-slider"
-        type="range"
-        class="range range-xs"
-        min="1"
-        max="32"
-        step="1"
-        value={store.params.stepsPerFrame}
-        oninput={setSteps}
-      />
-    </div>
+  <div class="border border-black">
+    <button
+      type="button"
+      class="w-full text-left px-2 py-1 text-xs font-bold uppercase tracking-wide bg-neutral-50 border-b border-black"
+      onclick={() => toggleSection("timing")}
+    >
+      Timing {sectionOpen.timing ? "−" : "+"}
+    </button>
+    {#if sectionOpen.timing}
+      <div class="p-2 flex flex-col gap-2">
+        <div class="flex flex-col gap-0.5">
+          <label
+            class="text-xs text-black/60 flex justify-between"
+            for="steps-slider"
+          >
+            Steps/Frame <span class="font-mono text-black"
+              >{store.params.stepsPerFrame}</span
+            >
+          </label>
+          <input
+            id="steps-slider"
+            type="range"
+            class="range range-xs"
+            min="1"
+            max="16"
+            step="1"
+            value={store.params.stepsPerFrame}
+            oninput={(e) => setParam("stepsPerFrame", e)}
+          />
+        </div>
+      </div>
+    {/if}
   </div>
 
   <!-- Pick from Map -->
