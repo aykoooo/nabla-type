@@ -15,11 +15,24 @@ export interface SimCanvasRef {
     resizeSimulation: (w: number, h: number) => void;
 }
 
+export interface ViewportRef {
+    centerCanvas: () => void;
+}
+
 class SimController {
     canvasRef: SimCanvasRef | null = null;
+    viewportRef: ViewportRef | null = null;
 
     setCanvasRef(ref: SimCanvasRef | null) {
         this.canvasRef = ref;
+    }
+
+    setViewportRef(ref: ViewportRef | null) {
+        this.viewportRef = ref;
+    }
+
+    handleCenter() {
+        this.viewportRef?.centerCanvas();
     }
 
     handleCanvasResize(w: number, h: number) {

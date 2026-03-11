@@ -122,50 +122,35 @@ ${paths}
     exportStatus = "Generating PNG…";
 
     try {
-      const sim = getSimulation();
-      if (!sim) throw new Error("Simulation not found");
+      const canvas = getCanvasElement?.();
+      if (!canvas) throw new Error("Canvas not found");
 
-      const srcW = sim.getWidth();
-      const srcH = sim.getHeight();
+      // Force a render so the canvas has the latest frame with colormap applied
+      const sim = getSimulation();
+      if (sim) {
+        sim.render(store.activeColormapId !== "blackwhite");
+      }
+
       const outW = Math.max(1, Math.round(pngWidth));
       const outH = Math.max(1, Math.round(pngHeight));
 
-      const pixels = sim.readPixels();
-      const rgba = new Uint8ClampedArray(srcW * srcH * 4);
-      for (let y = 0; y < srcH; y++) {
-        for (let x = 0; x < srcW; x++) {
-          const dst = (y * srcW + x) * 4;
-          const src = ((srcH - 1 - y) * srcW + x) * 4;
-          rgba[dst + 0] = pixels[src + 0];
-          rgba[dst + 1] = pixels[src + 1];
-          rgba[dst + 2] = pixels[src + 2];
-          rgba[dst + 3] = 255;
-        }
+      // If output size matches canvas, export directly
+      if (outW === canvas.width && outH === canvas.height) {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/png"),
+        );
+        if (!blob) throw new Error("toBlob returned null");
+        downloadBlob(blob);
+      } else {
+        // Scale via OffscreenCanvas
+        const outCanvas = new OffscreenCanvas(outW, outH);
+        const outCtx = outCanvas.getContext("2d");
+        if (!outCtx) throw new Error("Output context unavailable");
+        outCtx.imageSmoothingEnabled = false;
+        outCtx.drawImage(canvas, 0, 0, outW, outH);
+        const blob = await outCanvas.convertToBlob({ type: "image/png" });
+        downloadBlob(blob);
       }
-
-      const sourceCanvas = new OffscreenCanvas(srcW, srcH);
-      const sourceCtx = sourceCanvas.getContext("2d");
-      if (!sourceCtx) throw new Error("2D context unavailable");
-      sourceCtx.putImageData(new ImageData(rgba, srcW, srcH), 0, 0);
-
-      const outCanvas = new OffscreenCanvas(outW, outH);
-      const outCtx = outCanvas.getContext("2d");
-      if (!outCtx) throw new Error("Output context unavailable");
-      outCtx.imageSmoothingEnabled = false;
-      outCtx.fillStyle = "#ffffff";
-      outCtx.fillRect(0, 0, outW, outH);
-      outCtx.drawImage(sourceCanvas as any, 0, 0, outW, outH);
-
-      const blob = await outCanvas.convertToBlob({ type: "image/png" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `rd-type-${Date.now()}.png`;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
 
       exportStatus = "Done!";
       setTimeout(() => {
@@ -180,6 +165,18 @@ ${paths}
     } finally {
       exporting = false;
     }
+  }
+
+  function downloadBlob(blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rd-type-${Date.now()}.png`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 </script>
 

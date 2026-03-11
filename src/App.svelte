@@ -1,5 +1,6 @@
 <script lang="ts">
   import SimCanvas from "./components/SimCanvas.svelte";
+  import logoSvg from "./assets/logo.svg";
   import ResizableCanvas from "./components/ResizableCanvas.svelte";
   import PanZoomViewport from "./components/PanZoomViewport.svelte";
   import LayerStrip from "./components/LayerStrip.svelte";
@@ -20,6 +21,7 @@
   import { onMount, onDestroy } from "svelte";
 
   let simCanvas: SimCanvas;
+  let panZoomViewport: PanZoomViewport;
 
   // Track resolution changes for resize
   let lastWidth = store.resolution.width;
@@ -154,10 +156,14 @@
 
   onMount(() => {
     window.addEventListener("keydown", handleKeyDown);
+    simController.setViewportRef({
+      centerCanvas: () => panZoomViewport?.centerCanvas(),
+    });
   });
 
   onDestroy(() => {
     window.removeEventListener("keydown", handleKeyDown);
+    simController.setViewportRef(null);
   });
 </script>
 
@@ -166,11 +172,9 @@
   <header
     class="flex items-center border-b border-black shrink-0 relative bg-white z-10 border-r"
   >
-    <h1
-      class="text-sm font-black text-black tracking-tight px-4 py-2 border-r border-black shrink-0"
-    >
-      ∇ Nabla Type
-    </h1>
+    <a href="/" class="flex items-center justify-center w-10 border-r border-black shrink-0">
+      <img src={logoSvg} alt="Nabla Type" class="w-8 h-8 object-contain" />
+    </a>
     <TopControlBar />
   </header>
 
@@ -185,7 +189,7 @@
     >
       <!-- Canvas area with layer strip -->
       <div class="flex flex-1 min-h-0 relative">
-        <PanZoomViewport>
+        <PanZoomViewport bind:this={panZoomViewport}>
           <ResizableCanvas
             bind:width={store.resolution.width}
             bind:height={store.resolution.height}
@@ -219,6 +223,11 @@
 
         <div class="w-full h-px bg-black/20"></div>
 
+        <!-- Diffusion Parameters -->
+        <ParameterPanel />
+
+        <div class="w-full h-px bg-black/20"></div>
+
         <!-- Colormap settings -->
         <div class="flex flex-col gap-2">
           <h3 class="text-xs font-bold uppercase tracking-wider text-black">
@@ -226,11 +235,6 @@
           </h3>
           <ColormapPicker />
         </div>
-
-        <div class="w-full h-px bg-black/20"></div>
-
-        <!-- Diffusion Parameters -->
-        <ParameterPanel />
 
         <div class="w-full h-px bg-black/20"></div>
 

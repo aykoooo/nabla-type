@@ -8,6 +8,7 @@
     getPresetByName,
     loadUserPresets,
     paramsEqualRounded,
+    round4,
     saveUserPreset,
   } from "$lib/store/presetStore";
 
@@ -66,6 +67,14 @@
 
   function resetToBaseline() {
     applyPresetByName(store.activePreset);
+  }
+
+  function resetSingleParam(name: keyof typeof store.params) {
+    store.params[name] = store.baselineParams[name];
+  }
+
+  function isParamDirty(name: keyof typeof store.params): boolean {
+    return round4(store.params[name]) !== round4(store.baselineParams[name]);
   }
 
   function toggleSection(section: keyof typeof sectionOpen) {
@@ -146,7 +155,7 @@
             class="border border-black bg-white text-black px-2 py-1 text-xs font-bold uppercase hover:bg-black hover:text-white"
             onclick={resetToBaseline}
           >
-            Reset params
+            Reset all
           </button>
         {/if}
       </div>
@@ -166,12 +175,21 @@
       <div class="p-2 flex flex-col gap-2">
         <div class="flex flex-col gap-0.5">
           <label
-            class="text-xs text-black/60 flex justify-between"
+            class="text-xs text-black/60 flex justify-between items-center"
             for="feed-slider"
           >
-            Feed <span class="font-mono text-black"
-              >{store.params.feed.toFixed(4)}</span
-            >
+            <span>Feed</span>
+            <span class="flex items-center gap-1">
+              <span class="font-mono text-black">{store.params.feed.toFixed(4)}</span>
+              {#if isParamDirty('feed')}
+                <button
+                  type="button"
+                  class="text-black/40 hover:text-black text-[10px] leading-none"
+                  title="Reset feed"
+                  onclick={() => resetSingleParam('feed')}
+                >↩</button>
+              {/if}
+            </span>
           </label>
           <input
             id="feed-slider"
@@ -187,12 +205,21 @@
 
         <div class="flex flex-col gap-0.5">
           <label
-            class="text-xs text-black/60 flex justify-between"
+            class="text-xs text-black/60 flex justify-between items-center"
             for="kill-slider"
           >
-            Kill <span class="font-mono text-black"
-              >{store.params.kill.toFixed(4)}</span
-            >
+            <span>Kill</span>
+            <span class="flex items-center gap-1">
+              <span class="font-mono text-black">{store.params.kill.toFixed(4)}</span>
+              {#if isParamDirty('kill')}
+                <button
+                  type="button"
+                  class="text-black/40 hover:text-black text-[10px] leading-none"
+                  title="Reset kill"
+                  onclick={() => resetSingleParam('kill')}
+                >↩</button>
+              {/if}
+            </span>
           </label>
           <input
             id="kill-slider"
@@ -208,13 +235,21 @@
 
         <div class="flex flex-col gap-0.5">
           <label
-            class="text-xs text-black/60 flex justify-between"
+            class="text-xs text-black/60 flex justify-between items-center"
             for="da-slider"
           >
-            D<sub>a</sub>
-            <span class="font-mono text-black"
-              >{store.params.da.toFixed(2)}</span
-            >
+            <span>D<sub>a</sub></span>
+            <span class="flex items-center gap-1">
+              <span class="font-mono text-black">{store.params.da.toFixed(2)}</span>
+              {#if isParamDirty('da')}
+                <button
+                  type="button"
+                  class="text-black/40 hover:text-black text-[10px] leading-none"
+                  title="Reset Da"
+                  onclick={() => resetSingleParam('da')}
+                >↩</button>
+              {/if}
+            </span>
           </label>
           <input
             id="da-slider"
@@ -230,13 +265,21 @@
 
         <div class="flex flex-col gap-0.5">
           <label
-            class="text-xs text-black/60 flex justify-between"
+            class="text-xs text-black/60 flex justify-between items-center"
             for="db-slider"
           >
-            D<sub>b</sub>
-            <span class="font-mono text-black"
-              >{store.params.db.toFixed(2)}</span
-            >
+            <span>D<sub>b</sub></span>
+            <span class="flex items-center gap-1">
+              <span class="font-mono text-black">{store.params.db.toFixed(2)}</span>
+              {#if isParamDirty('db')}
+                <button
+                  type="button"
+                  class="text-black/40 hover:text-black text-[10px] leading-none"
+                  title="Reset Db"
+                  onclick={() => resetSingleParam('db')}
+                >↩</button>
+              {/if}
+            </span>
           </label>
           <input
             id="db-slider"
@@ -252,12 +295,21 @@
 
         <div class="flex flex-col gap-0.5">
           <label
-            class="text-xs text-black/60 flex justify-between"
+            class="text-xs text-black/60 flex justify-between items-center"
             for="dt-slider"
           >
-            dt <span class="font-mono text-black"
-              >{store.params.dt.toFixed(2)}</span
-            >
+            <span>dt</span>
+            <span class="flex items-center gap-1">
+              <span class="font-mono text-black">{store.params.dt.toFixed(2)}</span>
+              {#if isParamDirty('dt')}
+                <button
+                  type="button"
+                  class="text-black/40 hover:text-black text-[10px] leading-none"
+                  title="Reset dt"
+                  onclick={() => resetSingleParam('dt')}
+                >↩</button>
+              {/if}
+            </span>
           </label>
           <input
             id="dt-slider"

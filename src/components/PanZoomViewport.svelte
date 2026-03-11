@@ -129,15 +129,14 @@
             MAX_SCALE,
         );
 
-        const rect = containerEl.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
+        // Zoom relative to viewport center.
+        // In our coordinate system, translateX/Y are offsets from center,
+        // so viewport center is at (0, 0) in the offset space.
+        const pointX = (0 - translateX) / scale;
+        const pointY = (0 - translateY) / scale;
 
-        const pointX = (centerX - translateX) / scale;
-        const pointY = (centerY - translateY) / scale;
-
-        translateX = centerX - pointX * newScale;
-        translateY = centerY - pointY * newScale;
+        translateX = 0 - pointX * newScale;
+        translateY = 0 - pointY * newScale;
 
         scale = newScale;
     }
@@ -146,6 +145,10 @@
         scale = 1;
         translateX = 0;
         translateY = 0;
+    }
+
+    export function centerCanvas() {
+        resetZoom();
     }
 </script>
 
@@ -198,9 +201,15 @@
             aria-label="Reset Zoom">{Math.round(scale * 100)}%</button
         >
         <button
-            class="px-3 py-1.5 hover:bg-neutral-100 font-mono text-sm leading-none flex items-center justify-center transition-colors"
+            class="px-3 py-1.5 hover:bg-neutral-100 border-r border-black font-mono text-sm leading-none flex items-center justify-center transition-colors"
             onclick={() => zoomCenter(1.1)}
             aria-label="Zoom In">+</button
+        >
+        <button
+            class="px-3 py-1.5 hover:bg-neutral-100 font-mono text-sm leading-none flex items-center justify-center transition-colors"
+            onclick={resetZoom}
+            aria-label="Center Canvas"
+            title="Center canvas and reset zoom">⛶</button
         >
     </div>
 </div>

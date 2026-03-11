@@ -7,10 +7,10 @@
 </script>
 
 <div
-    class="flex flex-col border-r border-black bg-white shrink-0 w-12 items-center py-2 gap-2"
+    class="flex flex-col border-r border-black bg-white shrink-0 w-10 items-center py-2 gap-2"
 >
     <button
-        class="w-8 h-8 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-inherit"
+        class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-inherit"
         onclick={() => simController.handleMin()}
         disabled={!canMin}
         title="Crop canvas to fit simulation"
@@ -18,17 +18,17 @@
         <span class="text-[9px] font-bold leading-tight uppercase">Min</span>
     </button>
     <button
-        class="w-8 h-8 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
+        class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
         onclick={() => simController.handleMax()}
         title="Maximize canvas"
     >
         <span class="text-[9px] font-bold leading-tight uppercase">Max</span>
     </button>
 
-    <div class="w-8 h-px bg-black/20 my-1"></div>
+    <div class="w-7 h-px bg-black/20 my-1"></div>
 
     <button
-        class="w-8 h-8 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-inherit"
+        class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-inherit"
         onclick={() => simController.handleUndo()}
         disabled={!canUndo}
         title="Undo to last paused snapshot"
@@ -50,7 +50,7 @@
     </button>
 
     <button
-        class="w-8 h-8 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
+        class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
         onclick={() => simController.handleSave()}
         title="Save as PNG"
     >
@@ -70,10 +70,10 @@
         </svg>
     </button>
 
-    <div class="w-8 h-px bg-black/20 my-1"></div>
+    <div class="w-7 h-px bg-black/20 my-1"></div>
 
     <button
-        class="w-8 h-8 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
+        class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
         onclick={() => simController.handleLoop()}
         title="Reset"
     >
@@ -94,7 +94,7 @@
     </button>
 
     <button
-        class="w-8 h-8 flex flex-col items-center justify-center border border-black text-red-600 hover:bg-red-600 hover:text-white group"
+        class="w-7 h-7 flex flex-col items-center justify-center border border-black text-red-600 hover:bg-red-600 hover:text-white group"
         onclick={() => simController.handleTrash()}
         title="Clear simulation"
     >
