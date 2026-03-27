@@ -53,7 +53,7 @@
       resolutionLocked: store.resolutionLocked,
       aspectMode: store.aspectMode,
       useParamMaps: store.useParamMaps,
-      activePreset: store.activePreset,
+      activePresetId: store.activePresetId,
       seedText: store.seedText,
       seedFontSize: store.seedFontSize,
       seedFont: store.seedFont,
@@ -88,7 +88,7 @@
     store.resolutionLocked = snap.resolutionLocked;
     store.aspectMode = snap.aspectMode;
     store.useParamMaps = snap.useParamMaps;
-    store.activePreset = snap.activePreset;
+    store.activePresetId = snap.activePresetId;
     store.seedText = snap.seedText;
     store.seedFontSize = snap.seedFontSize;
     store.seedFont = snap.seedFont;
@@ -370,12 +370,18 @@
   });
 </script>
 
-<div class="relative inline-block">
+<div class="relative inline-block h-full w-full">
   {#if errorMsg}
     <div
-      class="absolute inset-0 flex items-center justify-center bg-red-100 z-10 p-8"
+      class="absolute inset-0 flex flex-col items-center justify-center bg-neutral-100 z-10 p-8"
     >
-      <p class="text-red-600 text-center max-w-sm">⚠ {errorMsg}</p>
+      <div class="border border-black bg-white p-6 max-w-md w-full shadow-[8px_8px_0px_#000]">
+          <h2 class="text-lg font-bold uppercase tracking-widest mb-3 border-b border-black pb-2 text-red-600">⚠ Hardware Error</h2>
+          <p class="text-sm font-mono text-black break-words mb-4">{errorMsg}</p>
+          <p class="text-xs font-mono text-black/70">
+              Simulation requires WebGL1 with OES_texture_float support.
+          </p>
+      </div>
     </div>
   {/if}
   <canvas

@@ -13,11 +13,18 @@ export class SimLoopManager {
     private fpsAccumulator = 0;
     private simAccumulatorMs = 0;
     private captureAccumulatorMs = 0;
+    private lastParamsKey = "";
+
+    private buildParamsKey(): string {
+        const p = store.params;
+        return `${p.feed}|${p.kill}|${p.da}|${p.db}|${p.dt}|${Math.round(p.stepsPerFrame)}`;
+    }
 
     start(sim: GrayScott) {
         this.sim = sim;
         this.isLooping = true;
         this.lastFrameTime = 0;
+        this.lastParamsKey = this.buildParamsKey();
         this.animFrameId = requestAnimationFrame(this.loop.bind(this));
     }
 
@@ -68,10 +75,14 @@ export class SimLoopManager {
         const targetFps = Math.max(0, Math.round(store.targetFps));
         const simInterval = targetFps > 0 ? 1000 / targetFps : 0;
         const shouldSimStep = simInterval === 0 || this.simAccumulatorMs >= simInterval;
+        const paramsKey = this.buildParamsKey();
+        const paramsChanged = paramsKey !== this.lastParamsKey;
 
-        if (store.isRunning && shouldSimStep) {
+        if (store.isRunning && (shouldSimStep || paramsChanged)) {
             if (simInterval > 0) {
-                this.simAccumulatorMs -= simInterval;
+                this.simAccumulatorMs = shouldSimStep
+                    ? Math.max(0, this.simAccumulatorMs - simInterval)
+                    : 0;
             }
             const clampedSteps = Math.max(1, Math.min(16, Math.round(store.params.stepsPerFrame)));
 
@@ -80,6 +91,8 @@ export class SimLoopManager {
             didSimAdvance = true;
             store.iterationCount += clampedSteps;
         }
+
+        this.lastParamsKey = paramsKey;
 
         this.sim.render(store.activeColormapId !== "blackwhite");
 

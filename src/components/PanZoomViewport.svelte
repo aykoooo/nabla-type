@@ -1,7 +1,15 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
 
-    let { children }: { children: Snippet } = $props();
+    let {
+        children,
+        contentMinWidth = 0,
+        contentMinHeight = 0,
+    }: {
+        children: Snippet;
+        contentMinWidth?: number;
+        contentMinHeight?: number;
+    } = $props();
 
     let containerEl: HTMLDivElement;
     let contentEl: HTMLDivElement;
@@ -101,7 +109,7 @@
         if (e.ctrlKey || e.metaKey) {
             if (e.key === "0" || e.code === "Numpad0") {
                 e.preventDefault();
-                resetZoom();
+                resetView();
             } else if (
                 e.key === "=" ||
                 e.key === "+" ||
@@ -141,14 +149,19 @@
         scale = newScale;
     }
 
-    function resetZoom() {
+    function resetView() {
         scale = 1;
         translateX = 0;
         translateY = 0;
     }
 
     export function centerCanvas() {
-        resetZoom();
+        translateX = 0;
+        translateY = 0;
+    }
+
+    export function getScale(): number {
+        return scale;
     }
 </script>
 
@@ -158,11 +171,7 @@
 <div
     bind:this={containerEl}
     class="w-full h-full relative overflow-hidden bg-neutral-100 touch-none select-none"
-    style="cursor: {isSpaceDown
-        ? 'grab'
-        : isDragging
-          ? 'grabbing'
-          : 'default'};"
+    style="cursor: {isSpaceDown ? 'grab' : isDragging ? 'grabbing' : 'default'};"
     onwheel={handleWheel}
     onpointerdown={handlePointerDown}
     onpointermove={handlePointerMove}
@@ -188,28 +197,28 @@
 
     <!-- Zoom Controls -->
     <div
-        class="absolute bottom-4 right-4 flex items-center bg-white border border-black shadow-sm z-50"
+        class="absolute bottom-4 right-4 flex items-stretch bg-white border border-black shadow-sm z-50"
     >
         <button
-            class="px-3 py-1.5 hover:bg-neutral-100 border-r border-black font-mono text-sm leading-none flex items-center justify-center transition-colors"
+            class="px-3 py-1.5 h-full hover:bg-neutral-100 border-r border-black font-mono text-sm leading-none flex items-center justify-center transition-colors"
             onclick={() => zoomCenter(0.9)}
             aria-label="Zoom Out">-</button
         >
         <button
-            class="px-3 py-1.5 hover:bg-neutral-100 border-r border-black font-mono text-xs min-w-[4rem] text-center leading-none transition-colors"
-            onclick={resetZoom}
+            class="px-3 py-1.5 h-full hover:bg-neutral-100 border-r border-black font-mono text-xs min-w-[4rem] text-center leading-none transition-colors"
+            onclick={resetView}
             aria-label="Reset Zoom">{Math.round(scale * 100)}%</button
         >
         <button
-            class="px-3 py-1.5 hover:bg-neutral-100 border-r border-black font-mono text-sm leading-none flex items-center justify-center transition-colors"
+            class="px-3 py-1.5 h-full hover:bg-neutral-100 border-r border-black font-mono text-sm leading-none flex items-center justify-center transition-colors"
             onclick={() => zoomCenter(1.1)}
             aria-label="Zoom In">+</button
         >
         <button
-            class="px-3 py-1.5 hover:bg-neutral-100 font-mono text-sm leading-none flex items-center justify-center transition-colors"
-            onclick={resetZoom}
+            class="px-3 py-1.5 h-full hover:bg-neutral-100 font-mono text-sm leading-none flex items-center justify-center transition-colors"
+            onclick={centerCanvas}
             aria-label="Center Canvas"
-            title="Center canvas and reset zoom">⛶</button
+            title="Center canvas (keep zoom)">◎</button
         >
     </div>
 </div>

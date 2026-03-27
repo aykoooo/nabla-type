@@ -3,10 +3,27 @@
     import { replay } from "$lib/store/replayStore.svelte";
     import { simController } from "$lib/store/simController";
     import { onDestroy } from "svelte";
+    import { DropdownMenu } from "bits-ui";
+    import Tooltip from "./ui/Tooltip.svelte";
+    import ChevronsLeft from "lucide-svelte/icons/chevrons-left";
+    import ChevronLeft from "lucide-svelte/icons/chevron-left";
+    import ChevronDown from "lucide-svelte/icons/chevron-down";
+    import Play from "lucide-svelte/icons/play";
+    import Pause from "lucide-svelte/icons/pause";
+    import ChevronRight from "lucide-svelte/icons/chevron-right";
+    import ChevronsRight from "lucide-svelte/icons/chevrons-right";
 
-    function handleReplayWindowChange(event: Event) {
+    const bufferItems = [
+        { value: "60", label: "60" },
+        { value: "120", label: "120" },
+        { value: "180", label: "180" },
+        { value: "300", label: "300" },
+        { value: "480", label: "480" }
+    ];
+
+    function handleReplayWindowChange(value: string) {
         simController.handleReplayWindowChange(
-            Number((event.target as HTMLSelectElement).value),
+            Number(value),
         );
     }
 
@@ -32,10 +49,17 @@
         )
             return [];
 
-        const markers: number[] = [];
+        const markers: {
+            pct: number;
+            label: number;
+            iteration: number;
+            frameIndex: number;
+            showLabel: boolean;
+        }[] = [];
         const maxIndex = replay.frames.length - 1;
 
-        for (const iter of store.pauseIterations) {
+        for (let markerIndex = 0; markerIndex < store.pauseIterations.length; markerIndex++) {
+            const iter = store.pauseIterations[markerIndex];
             let closestIndex = -1;
             let minDiff = Infinity;
 
@@ -48,11 +72,43 @@
             }
 
             if (closestIndex >= 0 && minDiff < 100) {
-                markers.push((closestIndex / maxIndex) * 100);
+                markers.push({
+                    pct: (closestIndex / maxIndex) * 100,
+                    label: markerIndex + 1,
+                    iteration: iter,
+                    frameIndex: closestIndex,
+                    showLabel: true,
+                });
+            }
+        }
+
+        const LABEL_MIN_GAP_PCT = 3.6;
+        let lastShownPct = -Infinity;
+        for (const marker of markers) {
+            if (marker.pct - lastShownPct < LABEL_MIN_GAP_PCT) {
+                marker.showLabel = false;
+            } else {
+                marker.showLabel = true;
+                lastShownPct = marker.pct;
             }
         }
 
         return markers;
+    });
+
+    const activePauseLabel = $derived.by(() => {
+        if (pauseMarkers.length === 0 || replay.frames.length < 2) return null;
+        const cursor = Math.max(0, Math.min(replay.frames.length - 1, replay.cursor));
+        let best: typeof pauseMarkers[number] | null = null;
+        let bestDist = Infinity;
+        for (const marker of pauseMarkers) {
+            const dist = Math.abs(marker.frameIndex - cursor);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = marker;
+            }
+        }
+        return best;
     });
 
     // --- Custom track drag logic ---
@@ -93,7 +149,7 @@
     });
 </script>
 
-<div class="flex flex-col border-t border-black bg-white p-2 shrink-0">
+<div class="flex flex-col bg-white p-2 shrink-0">
     <!-- Custom timeline track row -->
     <div class="flex items-center gap-2 mb-2 px-1">
         <span
@@ -115,10 +171,36 @@
             ></div>
 
             <!-- Pause markers -->
-            {#each pauseMarkers as pct}
+            {#each pauseMarkers as marker}
                 <div
-                    class="absolute inset-y-0 w-px bg-black/80 pointer-events-none"
-                    style={`left: ${pct}%;`}
+                    class="absolute top-[2px] bottom-[2px] w-px pointer-events-none {activePauseLabel && activePauseLabel.label === marker.label
+                        ? 'bg-black'
+                        : 'bg-black/45'}"
+                    style={`left: ${marker.pct}%;`}
+                ></div>
+
+                <div
+                    class="absolute -translate-x-1/2 w-[3px] h-[3px] rounded-full pointer-events-none {activePauseLabel && activePauseLabel.label === marker.label
+                        ? 'bg-black'
+                        : 'bg-black/65'}"
+                    style={`left: ${marker.pct}%; top: 1px;`}
+                ></div>
+
+                {#if marker.showLabel}
+                    <div
+                        class="absolute bottom-[1px] -translate-x-1/2 text-[9px] font-mono leading-none px-0.5 rounded-sm pointer-events-none {activePauseLabel && activePauseLabel.label === marker.label
+                            ? 'bg-black text-white'
+                            : 'bg-white/85 text-black/65'}"
+                        style={`left: ${marker.pct}%;`}
+                    >
+                        {marker.label}
+                    </div>
+                {/if}
+
+                <div
+                    class="absolute inset-y-0 w-3 -translate-x-1/2 cursor-help"
+                    style={`left: ${marker.pct}%;`}
+                    title={`Pause #${marker.label}\nIteration: ${marker.iteration}\nFrame: ${marker.frameIndex + 1}`}
                 ></div>
             {/each}
 
@@ -137,117 +219,92 @@
             {/if}
         </div>
 
-        <span
-            class="text-[10px] font-mono text-right inline-flex items-center gap-0.5"
-            title="Frames captured / buffer size"
-        >
-            {replay.frames.length}/<select
-                class="bg-transparent text-[10px] font-mono border-none p-0 cursor-pointer hover:underline appearance-none"
-                style="width: auto;"
-                value={String(replay.maxFramesBack)}
-                onchange={handleReplayWindowChange}
-                title="Change buffer size"
-            >
-                <option value="60">60</option>
-                <option value="120">120</option>
-                <option value="180">180</option>
-                <option value="300">300</option>
-                <option value="480">480</option>
-            </select>
-        </span>
+        <Tooltip content="Frames captured / buffer size" side="top">
+            <span class="text-[10px] text-black/50 font-mono text-right inline-flex items-center gap-2 pr-2">
+                <span class="text-black/70">{replay.frames.length}/</span>
+                <Tooltip content="Change buffer size" side="top">
+                    <DropdownMenu.Root>
+                        <DropdownMenu.Trigger class="bg-transparent text-black/70 hover:text-black font-mono border-none p-0 m-0 cursor-pointer h-auto outline-none focus-visible:ring-0 underline decoration-dashed decoration-black/40 hover:decoration-black flex items-center gap-0.5">
+                            {replay.maxFramesBack} <ChevronDown class="w-3 h-3" strokeWidth={3} />
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                            <DropdownMenu.Content class="z-50 min-w-20 bg-white border border-black shadow-md p-1 outline-none" sideOffset={4}>
+                                {#each bufferItems as item}
+                                    <DropdownMenu.Item
+                                        class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs font-mono outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white"
+                                        onSelect={() => handleReplayWindowChange(item.value)}
+                                    >
+                                        {item.label}
+                                    </DropdownMenu.Item>
+                                {/each}
+                            </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
+                </Tooltip>
+            </span>
+        </Tooltip>
     </div>
 
     <!-- Playback buttons row (centered) -->
-    <div class="flex items-center justify-center">
+    <div class="flex items-center justify-center pt-2">
         <div class="flex items-center border border-black">
-            <button
-                class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                onclick={() => simController.handleReplayJump(-10)}
-                disabled={replay.frames.length === 0}
-                title="Jump back 10 frames"
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-3.5 w-3.5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    ><path d="M4 12l8-7v14z" /><path d="M12 12l8-7v14z" /></svg
+            <Tooltip content="Jump back 10 frames" side="top">
+                <button
+                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    onclick={() => simController.handleReplayJump(-10)}
+                    disabled={replay.frames.length === 0}
+                    aria-label="Jump back 10 frames"
                 >
-            </button>
-            <button
-                class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                onclick={() => simController.handleReplayStep(-1)}
-                disabled={replay.frames.length === 0}
-                title="Step back in recent history"
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-3.5 w-3.5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    ><path d="M6 12l8-7v14z" /><path d="M16 12l6-7v14z" /></svg
+                    <ChevronsLeft class="h-3.5 w-3.5" />
+                </button>
+            </Tooltip>
+            
+            <Tooltip content="Step back in recent history (ArrowLeft)" side="top">
+                <button
+                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    onclick={() => simController.handleReplayStep(-1)}
+                    disabled={replay.frames.length === 0}
+                    aria-label="Step back in recent history"
                 >
-            </button>
-            <button
-                class="w-10 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black {store.isRunning
-                    ? 'hover:bg-black hover:text-white'
-                    : 'bg-black text-white hover:bg-white hover:text-black'}"
-                onclick={() => simController.handlePause()}
-                title={store.isRunning
-                    ? "Pause (Space)"
-                    : "Play from selected history frame (Space)"}
-            >
-                {#if store.isRunning}
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                        ><rect x="6" y="4" width="4" height="16" rx="0" /><rect
-                            x="14"
-                            y="4"
-                            width="4"
-                            height="16"
-                            rx="0"
-                        /></svg
-                    >
-                {:else}
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="h-4 w-4"
-                        fill="currentColor"
-                        viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg
-                    >
-                {/if}
-            </button>
-            <button
-                class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                onclick={() => simController.handleReplayStep(1)}
-                disabled={replay.frames.length === 0}
-                title="Step forward in recent history"
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-3.5 w-3.5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    ><path d="M18 12l-8 7V5z" /><path d="M8 12L2 19V5z" /></svg
+                    <ChevronLeft class="h-3.5 w-3.5" />
+                </button>
+            </Tooltip>
+
+            <Tooltip content={store.isRunning ? "Pause (Space)" : "Play from selected history frame (Space)"} side="top">
+                <button
+                    class="w-10 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black {store.isRunning ? 'hover:bg-black hover:text-white' : 'bg-black text-white hover:bg-white hover:text-black'}"
+                    onclick={() => simController.handlePause()}
+                    aria-label={store.isRunning ? "Pause playback" : "Play from history"}
                 >
-            </button>
-            <button
-                class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                onclick={() => simController.handleReplayJump(10)}
-                disabled={replay.frames.length === 0}
-                title="Jump forward 10 frames"
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-3.5 w-3.5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                    ><path d="M20 12l-8 7V5z" /><path d="M12 12L4 19V5z" /></svg
+                    {#if store.isRunning}
+                        <Pause class="h-4 w-4" />
+                    {:else}
+                        <Play class="h-4 w-4" fill="currentColor" />
+                    {/if}
+                </button>
+            </Tooltip>
+
+            <Tooltip content="Step forward in recent history (ArrowRight)" side="top">
+                <button
+                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    onclick={() => simController.handleReplayStep(1)}
+                    disabled={replay.frames.length === 0}
+                    aria-label="Step forward in recent history"
                 >
-            </button>
+                    <ChevronRight class="h-3.5 w-3.5" />
+                </button>
+            </Tooltip>
+
+            <Tooltip content="Jump forward 10 frames" side="top">
+                <button
+                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    onclick={() => simController.handleReplayJump(10)}
+                    disabled={replay.frames.length === 0}
+                    aria-label="Jump forward 10 frames"
+                >
+                    <ChevronsRight class="h-3.5 w-3.5" />
+                </button>
+            </Tooltip>
         </div>
     </div>
 </div>

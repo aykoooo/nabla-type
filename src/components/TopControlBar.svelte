@@ -1,6 +1,18 @@
 <script lang="ts">
     import { store } from "$lib/store/simStore.svelte";
     import { simController } from "$lib/store/simController";
+    import Select from "./ui/Select.svelte";
+    import Tooltip from "./ui/Tooltip.svelte";
+    import MathInput from "./ui/MathInput.svelte";
+    import Lock from "lucide-svelte/icons/lock";
+    import Unlock from "lucide-svelte/icons/unlock";
+
+    const aspectItems = [
+        { value: "free", label: "Free" },
+        { value: "1:1", label: "1:1" },
+        { value: "4:3", label: "4:3" },
+        { value: "16:9", label: "16:9" },
+    ];
 
     let widthInput = $state(512);
     let heightInput = $state(512);
@@ -10,108 +22,128 @@
         heightInput = store.resolution.height;
     });
 
-    function applyResolution() {
+    function applyWidth() {
         simController.handleManualResolution(
             Number(widthInput),
             Number(heightInput),
+            "width",
         );
     }
 
-    function handleAspectChange(event: Event) {
-        const value = (event.target as HTMLSelectElement).value as
-            | "free"
-            | "1:1"
-            | "4:3"
-            | "16:9";
-        simController.handleAspectMode(value);
-    }
-
-    function handleLockChange(event: Event) {
-        simController.handleResolutionLock(
-            (event.target as HTMLInputElement).checked,
+    function applyHeight() {
+        simController.handleManualResolution(
+            Number(widthInput),
+            Number(heightInput),
+            "height",
         );
     }
 
-    function handleTargetFpsChange(event: Event) {
-        simController.handleTargetFps(
-            Number((event.target as HTMLInputElement).value),
-        );
+    let targetFpsInput = $state(store.targetFps);
+
+    $effect(() => {
+        targetFpsInput = store.targetFps;
+    });
+
+    function applyTargetFps() {
+        simController.handleTargetFps(targetFpsInput);
     }
 </script>
 
 <div
-    class="flex items-center gap-2 px-3 py-1.5 border-b border-black bg-white w-full overflow-x-auto shrink-0"
+    class="flex items-center gap-2 px-3 py-1.5 bg-white w-full overflow-x-auto shrink-0"
 >
     <div class="flex items-center gap-1">
         <span class="text-[11px] font-bold uppercase mr-1">Res</span>
-        <input
-            type="number"
-            min="32"
-            max="8192"
-            class="w-16 border border-black px-1 py-0.5 text-[11px]"
-            bind:value={widthInput}
-            onblur={applyResolution}
-            onkeydown={(e) => e.key === "Enter" && applyResolution()}
-            title="Width"
-        />
-        <span class="text-xs">×</span>
-        <input
-            type="number"
-            min="32"
-            max="8192"
-            class="w-16 border border-black px-1 py-0.5 text-[11px]"
-            bind:value={heightInput}
-            onblur={applyResolution}
-            onkeydown={(e) => e.key === "Enter" && applyResolution()}
-            title="Height"
-        />
-        <button
-            type="button"
-            class="px-1.5 py-0.5 text-[10px] font-bold border border-black hover:bg-black hover:text-white"
-            onclick={applyResolution}
-            title="Apply resolution"
+        <Tooltip content="Width (W)">
+            <div class="relative">
+                <MathInput
+                    class="w-16 border border-black px-1 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black pr-4"
+                    bind:value={widthInput}
+                    min={32}
+                    max={8192}
+                    decimals={0}
+                    onblur={applyWidth}
+                />
+                <span
+                    class="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-black/30 font-mono pointer-events-none"
+                    >W</span
+                >
+            </div>
+        </Tooltip>
+        <Tooltip
+            content={store.resolutionLocked
+                ? "Locked — click to unlock"
+                : "Click to lock current ratio"}
+            side="bottom"
         >
-            Set
-        </button>
+            <button
+                type="button"
+                class="w-6 h-6 flex items-center justify-center shrink-0 {store.resolutionLocked
+                    ? 'text-black'
+                    : 'text-black/30 hover:text-black'}"
+                onclick={() =>
+                    store.resolutionLocked
+                        ? simController.handleAspectMode("free")
+                        : simController.handleLockCurrentRatio()}
+                aria-label={store.resolutionLocked
+                    ? "Unlock aspect ratio"
+                    : "Lock current aspect ratio"}
+            >
+                {#if store.resolutionLocked}
+                    <Lock class="w-3 h-3" strokeWidth={2.5} />
+                {:else}
+                    <Unlock class="w-3 h-3" strokeWidth={2.5} />
+                {/if}
+            </button>
+        </Tooltip>
+        <Tooltip content="Height (H)">
+            <div class="relative">
+                <MathInput
+                    class="w-16 border border-black px-1 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black pr-4"
+                    bind:value={heightInput}
+                    min={32}
+                    max={8192}
+                    decimals={0}
+                    onblur={applyHeight}
+                />
+                <span
+                    class="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-black/30 font-mono pointer-events-none"
+                    >H</span
+                >
+            </div>
+        </Tooltip>
     </div>
 
     <div class="w-px h-4 bg-black/20 mx-1"></div>
 
     <div class="flex items-center gap-1">
         <span class="text-[11px] font-bold uppercase mr-1">Aspect</span>
-        <select
-            class="border border-black px-1 py-0.5 text-[11px]"
-            value={store.aspectMode}
-            onchange={handleAspectChange}
-            title="Aspect ratio"
-        >
-            <option value="free">Free</option>
-            <option value="1:1">1:1</option>
-            <option value="4:3">4:3</option>
-            <option value="16:9">16:9</option>
-        </select>
-        <label class="flex items-center gap-1 text-[11px] ml-1">
-            <input
-                type="checkbox"
-                checked={store.resolutionLocked}
-                onchange={handleLockChange}
-            />
-            Lock
-        </label>
+        <Tooltip content="Aspect ratio preset" side="bottom">
+            <div class="w-16">
+                <Select
+                    class="h-6 text-[11px] px-1 py-0 bg-white"
+                    items={aspectItems}
+                    value={store.aspectMode}
+                    onValueChange={(v) =>
+                        simController.handleAspectMode(v as any)}
+                />
+            </div>
+        </Tooltip>
     </div>
 
     <div class="w-px h-4 bg-black/20 mx-1"></div>
 
     <div class="flex items-center gap-1">
         <span class="text-[11px] font-bold uppercase mr-1">FPS</span>
-        <input
-            type="number"
-            min="0"
-            max="240"
-            class="w-14 border border-black px-1 py-0.5 text-[11px]"
-            value={store.targetFps}
-            onchange={handleTargetFpsChange}
-            title="Target FPS (0 = unlimited)"
-        />
+        <Tooltip content="Target FPS (0 = unlimited)">
+            <MathInput
+                class="w-14 border border-black px-1 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black"
+                bind:value={targetFpsInput}
+                min={0}
+                max={240}
+                decimals={0}
+                onblur={applyTargetFps}
+            />
+        </Tooltip>
     </div>
 </div>

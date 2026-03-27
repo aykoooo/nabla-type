@@ -1,5 +1,7 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import { store } from "$lib/store/simStore.svelte";
+    import { applyAspect } from "$lib/utils/resolutionUtils";
 
     // Props: current canvas dimensions, callback for resize, and children slot
     let {
@@ -102,6 +104,20 @@
 
         previewW = newW;
         previewH = newH;
+
+        // Live aspect-ratio constraint during drag
+        if (store.resolutionLocked && store.aspectMode !== "free") {
+            const handleLen = activeHandle.length;
+            const basis =
+                handleLen === 1 && (activeHandle === "e" || activeHandle === "w")
+                    ? "width"
+                    : handleLen === 1 && (activeHandle === "n" || activeHandle === "s")
+                      ? "height"
+                      : "max";
+            const constrained = applyAspect(newW, newH, store.aspectMode, true, basis, store.customAspectRatio);
+            previewW = constrained.width;
+            previewH = constrained.height;
+        }
     }
 
     function onMouseUp() {
@@ -121,6 +137,22 @@
     function isCornerHandle(handle: string): boolean {
         return handle.length === 2;
     }
+
+    // The PanZoomViewport's flex centering shifts the ResizableCanvas element
+    // by Δ/2 whenever the preview wrapper grows. For N/W handles this causes
+    // the wrong edge to appear to move. We cancel that shift with an equal
+    // and opposite transform on the preview wrapper itself.
+    const compensateX = $derived(
+        dragging && activeHandle.includes("w") ? (previewW - startW) / 2 : 0
+    );
+    const compensateY = $derived(
+        dragging && activeHandle.includes("n") ? (previewH - startH) / 2 : 0
+    );
+    const previewTransform = $derived(
+        compensateX !== 0 || compensateY !== 0
+            ? `translate(${compensateX}px, ${compensateY}px)`
+            : ""
+    );
 </script>
 
 <div
@@ -136,9 +168,7 @@
   -->
     <div
         class="relative bg-white flex items-center justify-center"
-        style="width: {dragging ? previewW : width}px; height: {dragging
-            ? previewH
-            : height}px;"
+        style="width: {dragging ? previewW : width}px; height: {dragging ? previewH : height}px; transform: {previewTransform};"
     >
         {@render children()}
     </div>
@@ -152,9 +182,7 @@
             )} {activeHandle === handle
                 ? 'text-black'
                 : 'text-neutral-500 hover:text-black'}"
-            style="{handleStyle(
-                handle,
-            )}; filter: drop-shadow(0px 0px 1px rgba(255,255,255,0.8));"
+            style={handleStyle(handle)}
             onmousedown={(e) => onHandleDown(e, handle)}
             aria-label={`Resize ${handle}`}
         >
@@ -197,7 +225,7 @@
     {#if dragging}
         <div
             class="absolute border border-dashed border-black pointer-events-none z-10"
-            style="width: {previewW}px; height: {previewH}px; top: 0; left: 0; outline: 1px dashed white;"
+            style="width: {previewW}px; height: {previewH}px; top: 0; left: 0;"
         ></div>
         <div
             class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white border border-black px-2 py-0.5 text-[10px] font-mono font-bold z-30 whitespace-nowrap"

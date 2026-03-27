@@ -1,9 +1,5 @@
 @import "tailwindcss";
 
-@plugin "daisyui" {
-  themes: light;
-}
-
 :root {
   --rounded-box: 0;
   --rounded-btn: 0;
@@ -33,6 +29,95 @@ body {
 
 #app {
   height: 100%;
+}
+
+/* Native select popup consistency: avoid transient dark popup in some browsers/themes */
+select {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+select:focus,
+select:focus-visible {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+select option,
+select optgroup {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+/* Brutalist Slider */
+.brutal-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #e5e5e5;
+  cursor: pointer;
+  width: 100%;
+  height: 16px;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+.brutal-slider:focus {
+  outline: none;
+}
+
+/* WebKit Track */
+.brutal-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 16px;
+  background: transparent;
+  border: none;
+}
+
+/* WebKit Thumb */
+.brutal-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  height: 16px;
+  width: 16px;
+  background: #ffffff;
+  border: 4px solid #171717;
+  border-radius: 0;
+  margin-top: 0;
+  box-shadow: -100vw 0 0 100vw #171717;
+}
+
+.brutal-slider:hover::-webkit-slider-thumb {
+  background: #f0f0f0;
+}
+
+/* Firefox Track */
+.brutal-slider::-moz-range-track {
+  width: 100%;
+  height: 16px;
+  background: #e5e5e5;
+  border: none;
+}
+
+.brutal-slider::-moz-range-progress {
+  height: 16px;
+  background: #171717;
+  border: none;
+}
+
+/* Firefox Thumb */
+.brutal-slider::-moz-range-thumb {
+  box-sizing: border-box;
+  height: 16px;
+  width: 16px;
+  background: #ffffff;
+  border: 4px solid #171717;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.brutal-slider:hover::-moz-range-thumb {
+  background: #f0f0f0;
 }
 
 /* Scrollbar */

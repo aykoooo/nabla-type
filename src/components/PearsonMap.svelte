@@ -39,7 +39,6 @@
         store.params.kill = Number(killFromX(x, rect.width).toFixed(4));
 
         open = false;
-        dialogEl?.close();
     }
 
     function handleMove(e: MouseEvent) {
@@ -58,20 +57,28 @@
 
     function closeModal() {
         open = false;
-        dialogEl?.close();
     }
 
     $effect(() => {
-        if (open && dialogEl) {
+        if (open && dialogEl && !dialogEl.open) {
             dialogEl.showModal();
+        } else if (!open && dialogEl && dialogEl.open) {
+            dialogEl.close();
         }
     });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<dialog bind:this={dialogEl} class="modal" onclose={() => (open = false)}>
-    <div class="modal-box max-w-lg p-0 border border-black bg-white">
+<dialog
+    bind:this={dialogEl}
+    class="backdrop:bg-black/50 p-0 m-auto border border-black bg-white shadow-2xl w-[90vw] max-w-lg"
+    onclose={() => (open = false)}
+    onclick={(e) => {
+        if (e.target === dialogEl) closeModal();
+    }}
+>
+    <div class="p-0">
         <div
             class="p-3 border-b border-black flex items-center justify-between"
         >
@@ -122,7 +129,4 @@
             {/if}
         </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-    </form>
 </dialog>

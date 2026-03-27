@@ -1,6 +1,7 @@
 import { store } from "./simStore.svelte";
 import { replay } from "./replayStore.svelte";
 import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
+import { cloneParams, findActiveIndex, getPresetById } from "./presetStore";
 
 export interface SimCanvasRef {
     reseed: () => void;
@@ -17,6 +18,7 @@ export interface SimCanvasRef {
 
 export interface ViewportRef {
     centerCanvas: () => void;
+    getScale: () => number;
 }
 
 class SimController {
@@ -36,27 +38,42 @@ class SimController {
     }
 
     handleCanvasResize(w: number, h: number) {
-        const adjusted = applyAspect(w, h, store.aspectMode, store.resolutionLocked);
+        const adjusted = applyAspect(w, h, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
         const clamped = clampResolution(adjusted.width, adjusted.height);
         this.canvasRef?.resizeSimulation(clamped.width, clamped.height);
         store.resolution.width = clamped.width;
         store.resolution.height = clamped.height;
+        this.viewportRef?.centerCanvas();
     }
 
-    handleManualResolution(w: number, h: number) {
-        const adjusted = applyAspect(w, h, store.aspectMode, store.resolutionLocked);
+    handleManualResolution(w: number, h: number, basis: "width" | "height" | "max" = "max") {
+        const adjusted = applyAspect(w, h, store.aspectMode, store.resolutionLocked, basis, store.customAspectRatio);
         this.handleCanvasResize(adjusted.width, adjusted.height);
     }
 
-    handleAspectMode(mode: "free" | "1:1" | "4:3" | "16:9") {
+    handleAspectMode(mode: "free" | "1:1" | "4:3" | "16:9" | "custom") {
         store.aspectMode = mode;
         store.resolutionLocked = mode !== "free";
-        const current = applyAspect(store.resolution.width, store.resolution.height, store.aspectMode, store.resolutionLocked);
+        if (mode === "free") store.customAspectRatio = null;
+        const current = applyAspect(store.resolution.width, store.resolution.height, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
         this.handleCanvasResize(current.width, current.height);
+    }
+
+    handleLockCurrentRatio() {
+        const { width, height } = store.resolution;
+        if (width <= 0 || height <= 0) return;
+        store.customAspectRatio = width / height;
+        store.aspectMode = "custom";
+        store.resolutionLocked = true;
+        // No canvas resize — ratio is already satisfied by the current dimensions
     }
 
     handleResolutionLock(locked: boolean) {
         store.resolutionLocked = locked;
+        if (!locked) {
+            store.aspectMode = "free";
+            store.customAspectRatio = null;
+        }
     }
 
     handleTargetFps(value: number) {
@@ -66,16 +83,17 @@ class SimController {
     handleMin() {
         const activeSize = this.canvasRef?.getActiveBoundsSize();
         if (activeSize) {
-            const adjusted = applyAspect(activeSize.width, activeSize.height, store.aspectMode, store.resolutionLocked, "width");
+            const adjusted = applyAspect(activeSize.width, activeSize.height, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
             const clamped = clampResolution(adjusted.width, adjusted.height);
             this.handleCanvasResize(clamped.width, clamped.height);
         }
     }
 
     handleMax() {
-        const viewportW = Math.min(8192, Math.floor(window.innerWidth * 0.65));
-        const viewportH = Math.min(8192, Math.floor(window.innerHeight * 0.72));
-        const adjusted = applyAspect(viewportW, viewportH, store.aspectMode, store.resolutionLocked, "width");
+        const scale = Math.max(0.01, this.viewportRef?.getScale?.() ?? 1);
+        const viewportW = Math.min(8192, Math.floor((window.innerWidth * 0.65) / scale));
+        const viewportH = Math.min(8192, Math.floor((window.innerHeight * 0.72) / scale));
+        const adjusted = applyAspect(viewportW, viewportH, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
         const clamped = clampResolution(adjusted.width, adjusted.height);
         this.handleCanvasResize(clamped.width, clamped.height);
     }
@@ -148,6 +166,28 @@ class SimController {
 
     handleTrash() {
         this.canvasRef?.clearSimulation();
+    }
+
+    cyclePreset(direction: -1 | 1) {
+        const list = store.presets;
+        if (list.length === 0) return;
+        const idx = findActiveIndex(list, store.activePresetId);
+        const start = idx >= 0 ? idx : 0;
+        const next = (start + direction + list.length) % list.length;
+        this.applyPresetById(list[next].id);
+    }
+
+    applyPresetById(id: string) {
+        const entry = getPresetById(store.presets, id);
+        if (!entry) return;
+        store.activePresetId = id;
+        store.params.feed = entry.params.feed;
+        store.params.kill = entry.params.kill;
+        store.params.da = entry.params.da;
+        store.params.db = entry.params.db;
+        store.params.dt = entry.params.dt;
+        store.params.stepsPerFrame = entry.params.stepsPerFrame;
+        store.baselineParams = cloneParams(entry.params);
     }
 }
 

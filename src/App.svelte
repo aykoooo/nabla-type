@@ -3,7 +3,6 @@
   import logoSvg from "./assets/logo.svg";
   import ResizableCanvas from "./components/ResizableCanvas.svelte";
   import PanZoomViewport from "./components/PanZoomViewport.svelte";
-  import LayerStrip from "./components/LayerStrip.svelte";
   import InfoBar from "./components/InfoBar.svelte";
 
   import TopControlBar from "./components/TopControlBar.svelte";
@@ -11,14 +10,18 @@
   import BottomTimelineBar from "./components/BottomTimelineBar.svelte";
   import ParameterPanel from "./components/ParameterPanel.svelte";
   import SeedPanel from "./components/SeedPanel.svelte";
+  import { initStorePersistence } from "$lib/store/simStore.svelte";
   import ColormapPicker from "./components/ColormapPicker.svelte";
   import ExportPanel from "./components/ExportPanel.svelte";
+  import AccordionPanel from "./components/ui/AccordionPanel.svelte";
   import { GrayScott } from "$lib/simulation/GrayScott";
   import { SeedGenerator } from "$lib/seed/SeedGenerator";
+  import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
   import { store } from "$lib/store/simStore.svelte";
   import { replay } from "$lib/store/replayStore.svelte";
   import { simController } from "$lib/store/simController";
   import { onMount, onDestroy } from "svelte";
+  import { Tooltip } from "bits-ui";
 
   let simCanvas: SimCanvas;
   let panZoomViewport: PanZoomViewport;
@@ -27,42 +30,7 @@
   let lastWidth = store.resolution.width;
   let lastHeight = store.resolution.height;
   const seedGen = new SeedGenerator();
-
-  function getAspectRatio(): number | null {
-    switch (store.aspectMode) {
-      case "1:1":
-        return 1;
-      case "4:3":
-        return 4 / 3;
-      case "16:9":
-        return 16 / 9;
-      default:
-        return null;
-    }
-  }
-
-  function applyAspect(
-    w: number,
-    h: number,
-    basis: "width" | "height" = "width",
-  ) {
-    const ratio = getAspectRatio();
-    if (!store.resolutionLocked || !ratio) {
-      return { width: Math.round(w), height: Math.round(h) };
-    }
-
-    if (basis === "height") {
-      return { width: Math.round(h * ratio), height: Math.round(h) };
-    }
-    return { width: Math.round(w), height: Math.round(w / ratio) };
-  }
-
-  function clampResolution(w: number, h: number) {
-    return {
-      width: Math.max(32, Math.min(8192, Math.round(w))),
-      height: Math.max(32, Math.min(8192, Math.round(h))),
-    };
-  }
+  let seedPanel: ReturnType<typeof SeedPanel>;
 
   function handleReseed() {
     if (store.seedFont) {
@@ -82,15 +50,27 @@
 
   // Handle canvas resize from ResizableCanvas handles
   function handleCanvasResize(w: number, h: number) {
-    const adjusted = applyAspect(w, h);
+    const adjusted = applyAspect(
+      w,
+      h,
+      store.aspectMode,
+      store.resolutionLocked,
+      "max",
+    );
     const clamped = clampResolution(adjusted.width, adjusted.height);
     simCanvas?.resizeSimulation(clamped.width, clamped.height);
     lastWidth = clamped.width;
     lastHeight = clamped.height;
   }
 
-  function handleManualResolution(w: number, h: number) {
-    const adjusted = applyAspect(w, h);
+  function handleManualResolution(w: number, h: number, basis: "width" | "height" | "max" = "max") {
+    const adjusted = applyAspect(
+      w,
+      h,
+      store.aspectMode,
+      store.resolutionLocked,
+      basis,
+    );
     handleCanvasResize(adjusted.width, adjusted.height);
   }
 
@@ -100,6 +80,9 @@
     const current = applyAspect(
       store.resolution.width,
       store.resolution.height,
+      store.aspectMode,
+      store.resolutionLocked,
+      "max",
     );
     handleCanvasResize(current.width, current.height);
   }
@@ -131,11 +114,7 @@
 
   function handleCanvasFocus() {
     setTimeout(() => {
-      const input = document.getElementById(
-        "seed-text-input",
-      ) as HTMLInputElement | null;
-      input?.focus();
-      input?.select();
+      seedPanel?.focusInput();
     }, 0);
   }
 
@@ -148,29 +127,62 @@
     if (e.code === "Space") {
       e.preventDefault();
       simController.handlePause();
-    } else if (e.code === "KeyR") {
+    } else if (e.code === "KeyR" && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
       simController.handleLoop();
+    } else if (e.code === "BracketLeft") {
+      e.preventDefault();
+      simController.cyclePreset(-1);
+    } else if (e.code === "BracketRight") {
+      e.preventDefault();
+      simController.cyclePreset(1);
+    } else if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
+      e.preventDefault();
+      simController.handleSave();
+    } else if ((e.ctrlKey || e.metaKey) && e.code === "KeyZ") {
+      e.preventDefault();
+      simController.handleUndo();
+    } else if (e.code === "Backspace" || e.code === "Delete") {
+      e.preventDefault();
+      simController.handleTrash();
+    } else if (e.code === "ArrowLeft") {
+      e.preventDefault();
+      simController.handleReplayStep(-1);
+    } else if (e.code === "ArrowRight") {
+      e.preventDefault();
+      simController.handleReplayStep(1);
+    } else if (e.code === "KeyF" && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      simController.handleMax();
+    } else if (e.code === "KeyC" && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      simController.handleCenter();
     }
   }
 
+  let cleanupPersistence: () => void;
+
   onMount(() => {
+    cleanupPersistence = initStorePersistence();
     window.addEventListener("keydown", handleKeyDown);
     simController.setViewportRef({
       centerCanvas: () => panZoomViewport?.centerCanvas(),
+      getScale: () => panZoomViewport?.getScale() ?? 1,
     });
   });
 
   onDestroy(() => {
     window.removeEventListener("keydown", handleKeyDown);
     simController.setViewportRef(null);
+    if (cleanupPersistence) cleanupPersistence();
   });
 </script>
 
+<Tooltip.Provider>
 <div class="h-full flex flex-col bg-white overflow-hidden">
   <!-- Header + TopControlBar -->
   <header
-    class="flex items-center border-b border-black shrink-0 relative bg-white z-10 border-r"
+    class="flex items-center border-b border-black shrink-0 relative bg-white z-10"
   >
     <a href="/" class="flex items-center justify-center w-10 border-r border-black shrink-0">
       <img src={logoSvg} alt="Nabla Type" class="w-8 h-8 object-contain" />
@@ -188,8 +200,12 @@
       class="flex-1 flex flex-col min-w-0 border-r border-black relative bg-neutral-100"
     >
       <!-- Canvas area with layer strip -->
-      <div class="flex flex-1 min-h-0 relative">
-        <PanZoomViewport bind:this={panZoomViewport}>
+      <div class="flex flex-1 min-h-0 relative overflow-hidden border-b border-black">
+        <PanZoomViewport
+          bind:this={panZoomViewport}
+          contentMinWidth={store.resolution.width}
+          contentMinHeight={store.resolution.height}
+        >
           <ResizableCanvas
             bind:width={store.resolution.width}
             bind:height={store.resolution.height}
@@ -201,11 +217,10 @@
             />
           </ResizableCanvas>
         </PanZoomViewport>
-        <LayerStrip />
       </div>
 
       <!-- Info bar -->
-      <div class="shrink-0 bg-white border-t border-black">
+      <div class="shrink-0 bg-white border-b border-black">
         <InfoBar />
       </div>
 
@@ -216,36 +231,25 @@
     </div>
 
     <!-- RIGHT PANEL: Properties (Stacked) -->
-    <div class="w-80 flex flex-col shrink-0 bg-white overflow-y-auto">
-      <div class="p-3 flex flex-col gap-4">
-        <!-- Seed panel (Text input) -->
-        <SeedPanel onReseed={handleReseed} />
+    <div class="w-80 flex flex-col shrink-0 bg-neutral-100 overflow-y-auto">
+      <div class="flex flex-col border-b border-black">
+        <AccordionPanel title="Seed Text" open>
+          <SeedPanel bind:this={seedPanel} onReseed={handleReseed} />
+        </AccordionPanel>
 
-        <div class="w-full h-px bg-black/20"></div>
+        <AccordionPanel title="Parameters" open>
+          <ParameterPanel />
+        </AccordionPanel>
 
-        <!-- Diffusion Parameters -->
-        <ParameterPanel />
-
-        <div class="w-full h-px bg-black/20"></div>
-
-        <!-- Colormap settings -->
-        <div class="flex flex-col gap-2">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-black">
-            Colors
-          </h3>
+        <AccordionPanel title="Colors" open>
           <ColormapPicker />
-        </div>
+        </AccordionPanel>
 
-        <div class="w-full h-px bg-black/20"></div>
-
-        <!-- Exporter -->
-        <div class="flex flex-col gap-2 mb-8">
-          <h3 class="text-xs font-bold uppercase tracking-wider text-black">
-            Export
-          </h3>
+        <AccordionPanel title="Export" open>
           <ExportPanel {getSimulation} {getCanvasElement} />
-        </div>
+        </AccordionPanel>
       </div>
     </div>
   </div>
 </div>
+</Tooltip.Provider>

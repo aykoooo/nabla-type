@@ -2,6 +2,8 @@
   import { store } from "$lib/store/simStore.svelte";
   import { GrayScott } from "$lib/simulation/GrayScott";
   import { contours } from "d3-contour";
+  import Select from "./ui/Select.svelte";
+  import MathInput from "./ui/MathInput.svelte";
 
   let {
     getSimulation,
@@ -15,15 +17,11 @@
   let exportStatus = $state("");
   let exportPadding = $state(12);
   let pngScale = $state(1);
-  let pngWidth = $state(store.resolution.width);
-  let pngHeight = $state(store.resolution.height);
+  let advancedOpen = $state(false);
 
-  $effect(() => {
-    store.resolution.width;
-    store.resolution.height;
-    pngWidth = Math.max(1, Math.round(store.resolution.width * pngScale));
-    pngHeight = Math.max(1, Math.round(store.resolution.height * pngScale));
-  });
+  const pngWidth = $derived(Math.max(1, Math.round(store.resolution.width * pngScale)));
+  const pngHeight = $derived(Math.max(1, Math.round(store.resolution.height * pngScale)));
+
 
   function geoToSvgPath(geometry: any): string {
     let d = "";
@@ -180,80 +178,72 @@ ${paths}
   }
 </script>
 
-<div class="flex flex-col gap-3 p-3 border-t border-black">
-  <h3 class="text-xs font-bold uppercase tracking-wider text-black">Export</h3>
-
-  <p class="text-xs text-black/70">
-    Canvas: {store.resolution.width}×{store.resolution.height}
+<div class="flex flex-col gap-3">
+  <p class="text-[11px] text-black/70">
+    Output: {pngWidth} × {pngHeight}, padding {exportPadding}
   </p>
-
-  <div class="grid grid-cols-2 gap-2 text-xs">
-    <label class="flex flex-col gap-1">
-      <span>Padding</span>
-      <input
-        type="number"
-        min="0"
-        max="128"
-        bind:value={exportPadding}
-        class="border border-black px-2 py-1"
-      />
-    </label>
-    <label class="flex flex-col gap-1">
-      <span>PNG Scale</span>
-      <select
-        class="border border-black px-2 py-1"
-        bind:value={pngScale}
-        onchange={() => {
-          pngWidth = Math.max(1, Math.round(store.resolution.width * pngScale));
-          pngHeight = Math.max(
-            1,
-            Math.round(store.resolution.height * pngScale),
-          );
-        }}
-      >
-        <option value={1}>1x</option>
-        <option value={2}>2x</option>
-        <option value={4}>4x</option>
-      </select>
-    </label>
-    <label class="flex flex-col gap-1">
-      <span>PNG Width</span>
-      <input
-        type="number"
-        min="1"
-        max="8192"
-        bind:value={pngWidth}
-        class="border border-black px-2 py-1"
-      />
-    </label>
-    <label class="flex flex-col gap-1">
-      <span>PNG Height</span>
-      <input
-        type="number"
-        min="1"
-        max="8192"
-        bind:value={pngHeight}
-        class="border border-black px-2 py-1"
-      />
-    </label>
-  </div>
 
   <div class="flex gap-2">
     <button
-      class="border border-black bg-black text-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide disabled:opacity-50"
+      class="border border-black bg-black text-white px-3 py-1.5 text-xs font-semibold tracking-wide disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
       onclick={exportSVG}
       disabled={exporting}
     >
-      SVG
+      Export SVG
     </button>
     <button
-      class="border border-black bg-white text-black hover:bg-base-200 px-3 py-1.5 text-xs font-bold uppercase tracking-wide disabled:opacity-50"
+      class="border border-black bg-white text-black hover:bg-base-200 px-3 py-1.5 text-xs font-semibold tracking-wide disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
       onclick={exportPNG}
       disabled={exporting}
     >
-      PNG
+      Export PNG
     </button>
   </div>
+
+  <button
+    type="button"
+    class="text-left border border-black px-2 py-1.5 text-xs font-semibold bg-neutral-50 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
+    onclick={() => (advancedOpen = !advancedOpen)}
+  >
+    Advanced {advancedOpen ? "−" : "+"}
+  </button>
+
+  {#if advancedOpen}
+    <div class="grid grid-cols-2 gap-2 text-xs">
+      <label class="flex flex-col gap-1">
+        <span>Padding</span>
+        <MathInput
+          bind:value={exportPadding}
+          min={0}
+          max={128}
+          decimals={0}
+          class="border border-black px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 w-full"
+        />
+      </label>
+      <label class="flex flex-col gap-1">
+        <span>PNG Scale</span>
+        <Select
+          class="h-[28px] border border-black px-2 py-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 bg-white"
+          items={[
+            { value: "1", label: "1x" },
+            { value: "2", label: "2x" },
+            { value: "4", label: "4x" }
+          ]}
+          value={String(pngScale)}
+          onValueChange={(v) => { pngScale = Number(v); }}
+        />
+      </label>
+      <div class="flex flex-col gap-1">
+        <span>PNG Width</span>
+        <span class="border border-black px-2 py-1.5 text-xs font-mono bg-neutral-50 w-full">{pngWidth}px</span>
+      </div>
+      <div class="flex flex-col gap-1">
+        <span>PNG Height</span>
+        <span class="border border-black px-2 py-1.5 text-xs font-mono bg-neutral-50 w-full">{pngHeight}px</span>
+      </div>
+    </div>
+  {/if}
+
   {#if exportStatus}
     <p class="text-xs font-mono text-black/60">{exportStatus}</p>
   {/if}

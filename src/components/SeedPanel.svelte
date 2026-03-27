@@ -1,11 +1,19 @@
 <script lang="ts">
   import { store } from "$lib/store/simStore.svelte";
   import { FontLoader } from "$lib/seed/FontLoader";
+  import ParamInput from "./ui/ParamInput.svelte";
+  import Upload from "lucide-svelte/icons/upload";
 
   let { onReseed }: { onReseed: () => void } = $props();
 
   let fontLoader = new FontLoader();
   let autoApplyTimer: ReturnType<typeof setTimeout> | null = null;
+  let textInputEl: HTMLInputElement;
+
+  export function focusInput() {
+    textInputEl?.focus();
+    textInputEl?.select();
+  }
 
   function handleApply() {
     onReseed();
@@ -52,50 +60,40 @@
   });
 </script>
 
-<div class="flex flex-col gap-3 p-3 border-t border-black">
-  <h3 class="text-xs font-bold uppercase tracking-wider text-black">
-    Seed Text
-  </h3>
-
+<div class="flex flex-col gap-3">
   <div class="flex gap-2 items-center">
     <input
+      bind:this={textInputEl}
       id="seed-text-input"
       type="text"
-      class="border border-black px-2 py-1 text-xs bg-white flex-1"
+      class="h-7 border border-black px-2 text-xs bg-white flex-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black"
       bind:value={store.seedText}
       placeholder="Type text…"
       onkeydown={handleKeyDown}
     />
     <button
       type="button"
-      class="border border-black bg-black text-white px-3 py-1 text-xs font-bold uppercase"
+      class="h-7 border border-black bg-black text-white px-3 text-xs font-bold uppercase hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black"
       onclick={handleApply}>Apply</button
     >
   </div>
 
-  <div class="flex flex-col gap-0.5">
-    <label
-      class="text-xs text-black/60 flex justify-between"
-      for="font-size-slider"
-    >
-      Size <span class="font-mono text-black">{store.seedFontSize}px</span>
-    </label>
-    <input
-      id="font-size-slider"
-      type="range"
-      class="range range-xs"
-      min="20"
-      max="500"
-      step="1"
-      bind:value={store.seedFontSize}
-    />
-  </div>
+  <ParamInput
+    id="font-size-slider"
+    label="Size"
+    bind:value={store.seedFontSize}
+    min={20}
+    max={500}
+    step={1}
+    suffix="px"
+  />
 
   <div class="flex gap-2 items-center">
     <label
-      class="border border-black px-2 py-1 text-xs bg-white flex-1 cursor-pointer hover:bg-base-200 truncate text-center"
+      class="h-7 border border-black px-2 text-xs bg-white flex-1 flex justify-center items-center gap-1.5 cursor-pointer hover:bg-neutral-100 truncate focus-within:ring-1 focus-within:ring-black"
     >
-      {store.seedFontName || "Upload font (.ttf/.otf)"}
+      <Upload class="w-3.5 h-3.5 opacity-70" />
+      <span>{store.seedFontName || "Upload font (.ttf/.otf)"}</span>
       <input
         type="file"
         accept=".ttf,.otf,.woff,.woff2"
@@ -106,7 +104,7 @@
     {#if store.seedFontName}
       <button
         type="button"
-        class="border border-black px-2 py-1 text-xs text-red-600 hover:bg-red-600 hover:text-white"
+        class="w-7 h-7 flex items-center justify-center border border-black text-xs text-red-600 hover:bg-red-600 hover:text-white font-bold"
         onclick={clearFont}>✕</button
       >
     {/if}
