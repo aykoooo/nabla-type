@@ -1,236 +1,356 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
     import { store } from "$lib/store/simStore.svelte";
+    import { simController } from "$lib/store/simController";
     import { applyAspect } from "$lib/utils/resolutionUtils";
+    import { ColormapRegistry } from "$lib/colormaps/ColormapRegistry";
 
-    // Props: current canvas dimensions, callback for resize, and children slot
+    interface Props {
+        width?: number;
+        height?: number;
+        onresize?: (w: number, h: number) => void;
+        children: Snippet;
+    }
+
     let {
         width = $bindable(512),
         height = $bindable(512),
         onresize,
         children,
-    }: {
-        width: number;
-        height: number;
-        onresize?: (w: number, h: number) => void;
-        children: Snippet;
-    } = $props();
+    }: Props = $props();
 
+    // DOM Mount Ref
     let containerEl: HTMLDivElement;
 
-    // Drag state
-    let dragging = $state(false);
-    let activeHandle = $state("");
-    let startX = 0;
-    let startY = 0;
-    let startW = 0;
-    let startH = 0;
-    let previewW = $state(0);
-    let previewH = $state(0);
+    // Interaction State
+    let isDragging = $state(false);
+    let activeHandle = $state<string>("");
+    
+    // Drag Origin Coordinates
+    let startMouseX = 0;
+    let startMouseY = 0;
+    let startWidth = 0;
+    let startHeight = 0;
+    
+    // Live Preview Dimensions
+    let previewWidth = $state(0);
+    let previewHeight = $state(0);
+    
+    // Absolute Bounding Coordinates
+    let previewX = $state(0);
+    let previewY = $state(0);
 
     const MIN_SIZE = 64;
 
-    function handleStyle(handle: string): string {
-        const S = 18;
-        const H = S / 2;
-        switch (handle) {
-            case "nw":
-                return `width:${S}px; height:${S}px; top:-${H}px; left:-${H}px;`;
-            case "ne":
-                return `width:${S}px; height:${S}px; top:-${H}px; right:-${H}px;`;
-            case "sw":
-                return `width:${S}px; height:${S}px; bottom:-${H}px; left:-${H}px;`;
-            case "se":
-                return `width:${S}px; height:${S}px; bottom:-${H}px; right:-${H}px;`;
-            case "n":
-                return `height:${S}px; top:-${H}px; left:24px; right:24px;`;
-            case "s":
-                return `height:${S}px; bottom:-${H}px; left:24px; right:24px;`;
-            case "w":
-                return `width:${S}px; left:-${H}px; top:24px; bottom:24px;`;
-            case "e":
-                return `width:${S}px; right:-${H}px; top:24px; bottom:24px;`;
-            default:
-                return "";
+    const previewBgColor = $derived.by(() => {
+        if (store.activeColormapId === "custom") {
+            const stops = store.customGradientStops;
+            if (stops.length > 0) {
+                const sorted = [...stops].sort((a, b) => a.position - b.position);
+                return sorted[0].color;
+            }
+            return "#ffffff";
         }
+        
+        try {
+            const cm = ColormapRegistry.get(store.activeColormapId);
+            const lut = cm.buildLUT();
+            return `rgb(${lut[0]}, ${lut[1]}, ${lut[2]})`;
+        } catch {
+            return "#ffffff";
+        }
+    });
+
+    type HandleDirection = "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
+
+    const HANDLE_DIRECTIONS: Record<HandleDirection, [number, number]> = {
+        n:  [ 0, -1],
+        s:  [ 0,  1],
+        e:  [ 1,  0],
+        w:  [-1,  0],
+        nw: [-1, -1],
+        ne: [ 1, -1],
+        sw: [-1,  1],
+        se: [ 1,  1]
+    };
+
+    const HANDLES = Object.keys(HANDLE_DIRECTIONS) as HandleDirection[];
+
+    function getCursorClass(handle: HandleDirection): string {
+        return `cursor-${handle}-resize`;
     }
 
-    function cursorClass(handle: string): string {
-        const map: Record<string, string> = {
-            n: "cursor-n-resize",
-            s: "cursor-s-resize",
-            e: "cursor-e-resize",
-            w: "cursor-w-resize",
-            nw: "cursor-nw-resize",
-            ne: "cursor-ne-resize",
-            sw: "cursor-sw-resize",
-            se: "cursor-se-resize",
-        };
-        return map[handle] || "";
-    }
-
-    function onHandleDown(e: MouseEvent, handle: string) {
+    function onHandleMouseDown(e: MouseEvent, handle: HandleDirection) {
         e.preventDefault();
         e.stopPropagation();
-        dragging = true;
+        
+        isDragging = true;
         activeHandle = handle;
-        startX = e.clientX;
-        startY = e.clientY;
-        startW = width;
-        startH = height;
-        previewW = width;
-        previewH = height;
+        
+        startMouseX = e.clientX;
+        startMouseY = e.clientY;
+        startWidth = width;
+        startHeight = height;
+        
+        previewWidth = width;
+        previewHeight = height;
+        previewX = 0;
+        previewY = 0;
 
         window.addEventListener("mousemove", onMouseMove);
         window.addEventListener("mouseup", onMouseUp);
     }
 
     function onMouseMove(e: MouseEvent) {
-        if (!dragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
+        if (!isDragging) return;
+        
+        const scale = simController.viewportRef?.getScale?.() ?? 1;
+        const safeScale = scale === 0 ? 1 : scale;
+        const dx = (e.clientX - startMouseX) / safeScale;
+        const dy = (e.clientY - startMouseY) / safeScale;
 
-        let newW = startW;
-        let newH = startH;
+        const [dirX, dirY] = HANDLE_DIRECTIONS[activeHandle as HandleDirection] || [0, 0];
+        const isSymmetricalDrag = e.shiftKey;
 
-        if (activeHandle.includes("e"))
-            newW = Math.max(MIN_SIZE, startW + dx * 2);
-        if (activeHandle.includes("w"))
-            newW = Math.max(MIN_SIZE, startW - dx * 2);
-        if (activeHandle.includes("s"))
-            newH = Math.max(MIN_SIZE, startH + dy * 2);
-        if (activeHandle.includes("n"))
-            newH = Math.max(MIN_SIZE, startH - dy * 2);
+        let targetW = startWidth;
+        let targetH = startHeight;
 
-        previewW = newW;
-        previewH = newH;
+        if (isSymmetricalDrag) {
+            if (dirX !== 0) targetW = startWidth + dx * dirX * 2;
+            if (dirY !== 0) targetH = startHeight + dy * dirY * 2;
+        } else {
+            if (dirX !== 0) targetW = startWidth + dx * dirX;
+            if (dirY !== 0) targetH = startHeight + dy * dirY;
+        }
 
-        // Live aspect-ratio constraint during drag
+        // Clamp to absolute minimum
+        targetW = Math.max(MIN_SIZE, targetW);
+        targetH = Math.max(MIN_SIZE, targetH);
+
+        let finalW = targetW;
+        let finalH = targetH;
+
         if (store.resolutionLocked && store.aspectMode !== "free") {
-            const handleLen = activeHandle.length;
-            const basis =
-                handleLen === 1 && (activeHandle === "e" || activeHandle === "w")
-                    ? "width"
-                    : handleLen === 1 && (activeHandle === "n" || activeHandle === "s")
-                      ? "height"
-                      : "max";
-            const constrained = applyAspect(newW, newH, store.aspectMode, true, basis, store.customAspectRatio);
-            previewW = constrained.width;
-            previewH = constrained.height;
+            let primaryAxis: "width" | "height" | "max" = "max";
+            
+            if (dirX === 0) primaryAxis = "height";
+            else if (dirY === 0) primaryAxis = "width";
+
+            const constrainedSize = applyAspect(
+                targetW, 
+                targetH, 
+                store.aspectMode, 
+                true, 
+                primaryAxis, 
+                store.customAspectRatio
+            );
+            
+            finalW = constrainedSize.width;
+            finalH = constrainedSize.height;
+        }
+
+        previewWidth = finalW;
+        previewHeight = finalH;
+
+        if (isSymmetricalDrag) {
+            previewX = (startWidth - finalW) / 2;
+            previewY = (startHeight - finalH) / 2;
+        } else {
+            if (dirX === -1) previewX = startWidth - finalW;
+            else if (dirX === 1) previewX = 0;
+            else previewX = (startWidth - finalW) / 2;
+
+            if (dirY === -1) previewY = startHeight - finalH;
+            else if (dirY === 1) previewY = 0;
+            else previewY = (startHeight - finalH) / 2;
         }
     }
 
     function onMouseUp() {
-        if (!dragging) return;
-        dragging = false;
+        if (!isDragging) return;
+        
+        isDragging = false;
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
 
-        width = previewW;
-        height = previewH;
-        onresize?.(previewW, previewH);
+        width = previewWidth;
+        height = previewHeight;
+        
+        if (onresize) {
+            onresize(previewWidth, previewHeight);
+        }
+        
         activeHandle = "";
+        previewX = 0;
+        previewY = 0;
     }
-
-    const handles = ["n", "s", "e", "w", "nw", "ne", "sw", "se"] as const;
-
-    function isCornerHandle(handle: string): boolean {
-        return handle.length === 2;
-    }
-
-    // The PanZoomViewport's flex centering shifts the ResizableCanvas element
-    // by Δ/2 whenever the preview wrapper grows. For N/W handles this causes
-    // the wrong edge to appear to move. We cancel that shift with an equal
-    // and opposite transform on the preview wrapper itself.
-    const compensateX = $derived(
-        dragging && activeHandle.includes("w") ? (previewW - startW) / 2 : 0
-    );
-    const compensateY = $derived(
-        dragging && activeHandle.includes("n") ? (previewH - startH) / 2 : 0
-    );
-    const previewTransform = $derived(
-        compensateX !== 0 || compensateY !== 0
-            ? `translate(${compensateX}px, ${compensateY}px)`
-            : ""
-    );
 </script>
 
-<div
-    class="relative inline-block flex items-center justify-center"
-    bind:this={containerEl}
->
-    <!--
-    MS Paint style: During drag, the wrapper expands to previewW x previewH
-    but the canvas inside stays at its original pixel size (width x height).
-    This produces the "empty space around unchanged canvas" look.
-    On mouseup, width/height update and onresize fires, which actually
-    resizes the simulation.
-  -->
+<div class="canvas-mount-point" bind:this={containerEl} style:width="{width}px" style:height="{height}px">
+    
     <div
-        class="relative bg-white flex items-center justify-center"
-        style="width: {dragging ? previewW : width}px; height: {dragging ? previewH : height}px; transform: {previewTransform};"
+        class="preview-boundary z-10"
+        class:is-active={isDragging}
+        class:is-idle={!isDragging}
+        style:left="{isDragging ? previewX : 0}px"
+        style:top="{isDragging ? previewY : 0}px"
+        style:width="{isDragging ? previewWidth : width}px"
+        style:height="{isDragging ? previewHeight : height}px"
     >
-        {@render children()}
-    </div>
-
-    <!-- Resize handles: MS Paint style thin line markers with larger invisible hit areas -->
-    {#each handles as handle}
-        <button
-            type="button"
-            class="absolute z-20 bg-transparent border-0 p-0 transition-colors {cursorClass(
-                handle,
-            )} {activeHandle === handle
-                ? 'text-black'
-                : 'text-neutral-500 hover:text-black'}"
-            style={handleStyle(handle)}
-            onmousedown={(e) => onHandleDown(e, handle)}
-            aria-label={`Resize ${handle}`}
-        >
-            {#if handle === "n" || handle === "s"}
-                <span
-                    class="pointer-events-none absolute left-1/2 -translate-x-1/2 w-5 h-px bg-current"
-                    style={handle === "n" ? "top: 2px;" : "bottom: 2px;"}
-                ></span>
-            {:else if handle === "e" || handle === "w"}
-                <span
-                    class="pointer-events-none absolute top-1/2 -translate-y-1/2 w-px h-5 bg-current"
-                    style={handle === "w" ? "left: 2px;" : "right: 2px;"}
-                ></span>
-            {:else if isCornerHandle(handle)}
-                <span
-                    class="pointer-events-none absolute w-4 h-px bg-current"
-                    style={handle === "nw"
-                        ? "top: 2px; left: 2px;"
-                        : handle === "ne"
-                          ? "top: 2px; right: 2px;"
-                          : handle === "sw"
-                            ? "bottom: 2px; left: 2px;"
-                            : "bottom: 2px; right: 2px;"}
-                ></span>
-                <span
-                    class="pointer-events-none absolute w-px h-4 bg-current"
-                    style={handle === "nw"
-                        ? "top: 2px; left: 2px;"
-                        : handle === "ne"
-                          ? "top: 2px; right: 2px;"
-                          : handle === "sw"
-                            ? "bottom: 2px; left: 2px;"
-                            : "bottom: 2px; right: 2px;"}
-                ></span>
-            {/if}
-        </button>
-    {/each}
-
-    <!-- Preview outline during drag: black dashed border -->
-    {#if dragging}
+        <!-- Layer 1: Strict Overflow Mask & Background -->
         <div
-            class="absolute border border-dashed border-black pointer-events-none z-10"
-            style="width: {previewW}px; height: {previewH}px; top: 0; left: 0;"
-        ></div>
-        <div
-            class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white border border-black px-2 py-0.5 text-[10px] font-mono font-bold z-30 whitespace-nowrap"
+            class="content-mask transform-gpu"
+            style:background-color={isDragging ? previewBgColor : 'transparent'}
+            style:overflow={isDragging ? 'hidden' : 'visible'}
         >
-            {previewW} × {previewH}
+            <div class={isDragging ? 'content-fixed' : 'content-fluid'} 
+                 style:width={isDragging ? `${startWidth}px` : '100%'}
+                 style:height={isDragging ? `${startHeight}px` : '100%'}
+            >
+                {@render children()}
+            </div>
         </div>
-    {/if}
+
+        {#if isDragging}
+            <div class="preview-dashed-border z-10"></div>
+            
+            <div class="metrics-badge z-20">
+                {Math.round(previewWidth)} × {Math.round(previewHeight)}
+            </div>
+        {/if}
+
+        <!-- Interactive Drag Handles -->
+        {#each HANDLES as handle}
+            <button
+                type="button"
+                class="drag-handle z-30 {getCursorClass(handle)} {activeHandle === handle ? 'text-black' : 'text-neutral-500 hover:text-black'}"
+                onmousedown={(e) => onHandleMouseDown(e, handle)}
+                class:h-nw={handle === "nw"} class:h-ne={handle === "ne"} class:h-sw={handle === "sw"} class:h-se={handle === "se"}
+                class:h-n={handle === "n"} class:h-s={handle === "s"} class:h-w={handle === "w"} class:h-e={handle === "e"}
+                aria-label={`Resize ${handle}`}
+            >
+                {#if handle === "n" || handle === "s"}
+                    <span class="handle-line handle-n-s" class:h-line-top={handle === "n"} class:h-line-bottom={handle === "s"}></span>
+                {:else if handle === "e" || handle === "w"}
+                    <span class="handle-line handle-e-w" class:h-line-left={handle === "w"} class:h-line-right={handle === "e"}></span>
+                {:else}
+                    <span class="handle-line handle-corner-h" class:h-line-top={handle.includes("n")} class:h-line-bottom={handle.includes("s")} class:h-line-left={handle.includes("w")} class:h-line-right={handle.includes("e")}></span>
+                    <span class="handle-line handle-corner-v" class:h-line-top={handle.includes("n")} class:h-line-bottom={handle.includes("s")} class:h-line-left={handle.includes("w")} class:h-line-right={handle.includes("e")}></span>
+                {/if}
+            </button>
+        {/each}
+    </div>
 </div>
+
+<style>
+    .canvas-mount-point {
+        position: relative;
+        display: block;
+        transform: translateZ(0);
+    }
+
+    .preview-boundary.is-active {
+        position: absolute;
+    }
+
+    .preview-boundary.is-idle {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    .content-mask {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .content-fixed {
+        position: relative;
+    }
+
+    .content-fluid {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    .preview-dashed-border {
+        position: absolute;
+        inset: 0;
+        border: 1px dashed black;
+        pointer-events: none;
+        box-sizing: border-box;
+    }
+
+    .metrics-badge {
+        position: absolute;
+        bottom: -1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: white;
+        border: 1px solid black;
+        padding: 0.125rem 0.5rem;
+        font-size: 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .drag-handle {
+        position: absolute;
+        background-color: transparent;
+        border: none;
+        padding: 0;
+        transition: color 0.15s ease-in-out;
+    }
+
+    /* Placements (Standard 18px box, offset -9px to bleed edge) */
+    .h-nw { width: 18px; height: 18px; top: -9px; left: -9px; }
+    .h-ne { width: 18px; height: 18px; top: -9px; right: -9px; }
+    .h-sw { width: 18px; height: 18px; bottom: -9px; left: -9px; }
+    .h-se { width: 18px; height: 18px; bottom: -9px; right: -9px; }
+    .h-n  { height: 18px; top: -9px; left: 24px; right: 24px; }
+    .h-s  { height: 18px; bottom: -9px; left: 24px; right: 24px; }
+    .h-w  { width: 18px; left: -9px; top: 24px; bottom: 24px; }
+    .h-e  { width: 18px; right: -9px; top: 24px; bottom: 24px; }
+
+    /* Lines */
+    .handle-line {
+        pointer-events: none;
+        position: absolute;
+        background-color: currentColor;
+    }
+
+    .handle-n-s {
+        left: 50%;
+        transform: translateX(-50%);
+        width: 1.25rem;
+        height: 1px;
+    }
+
+    .handle-e-w {
+        top: 50%;
+        transform: translateY(-50%);
+        width: 1px;
+        height: 1.25rem;
+    }
+
+    .handle-corner-h {
+        width: 1rem;
+        height: 1px;
+    }
+
+    .handle-corner-v {
+        width: 1px;
+        height: 1rem;
+    }
+
+    /* Target edges */
+    .h-line-top    { top: 2px; }
+    .h-line-bottom { bottom: 2px; }
+    .h-line-left   { left: 2px; }
+    .h-line-right  { right: 2px; }
+</style>
