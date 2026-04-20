@@ -15,8 +15,7 @@
   import { replay } from "$lib/store/replayStore.svelte";
   import { SimLoopManager } from "$lib/simulation/SimLoopManager";
   import { simController } from "$lib/store/simController";
-
-  let { onCanvasClick }: { onCanvasClick?: () => void } = $props();
+  let { onCanvasDblClick }: { onCanvasDblClick?: () => void } = $props();
 
   // Register built-in colormaps
   ColormapRegistry.register(blackwhite);
@@ -388,7 +387,7 @@
     bind:this={canvasEl}
     width={store.resolution.width}
     height={store.resolution.height}
-    onclick={onCanvasClick}
+    ondblclick={onCanvasDblClick}
     style="display: block; image-rendering: pixelated;"
   ></canvas>
 </div>

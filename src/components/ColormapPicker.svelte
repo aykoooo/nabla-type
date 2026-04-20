@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
   import { store } from "$lib/store/simStore.svelte";
   import { ColormapRegistry } from "$lib/colormaps/ColormapRegistry";
   import type { GradientStop } from "$lib/store/simStore.svelte";
@@ -109,9 +108,11 @@
     window.addEventListener("mouseup", handleWindowMouseUp);
   }
 
-  onDestroy(() => {
-    window.removeEventListener("mousemove", handleWindowMouseMove);
-    window.removeEventListener("mouseup", handleWindowMouseUp);
+  $effect(() => {
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
   });
 
   function addGradientStop() {
@@ -192,7 +193,7 @@
           <Tooltip content={`Stop ${i + 1}: ${Math.round(item.stop.position * 100)}%`} side="top">
             <button
               type="button"
-              class="absolute top-0 bottom-0 -translate-x-1/2 w-4 group"
+              class="absolute top-0 bottom-0 -translate-x-1/2 w-4 hover:z-50"
               style={`left: ${item.stop.position * 100}%;`}
               onmousedown={(e) => startStopDrag(item.index, e)}
               onclick={() => (selectedStopIndex = item.index)}
@@ -202,13 +203,13 @@
                 class="pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px {selectedStopIndex ===
                 item.index
                   ? 'bg-black'
-                  : 'bg-neutral-700 group-hover:bg-black'}"
+                  : 'bg-neutral-700 hover:bg-black'}"
               ></span>
               <span
                 class="pointer-events-none absolute left-1/2 -translate-x-1/2 -bottom-0.5 w-2 h-2 border border-black {selectedStopIndex ===
                 item.index
                   ? 'bg-black'
-                  : 'bg-white group-hover:bg-black'}"
+                  : 'bg-white hover:bg-black'}"
               ></span>
             </button>
           </Tooltip>

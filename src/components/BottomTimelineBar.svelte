@@ -2,7 +2,6 @@
     import { store } from "$lib/store/simStore.svelte";
     import { replay } from "$lib/store/replayStore.svelte";
     import { simController } from "$lib/store/simController";
-    import { onDestroy } from "svelte";
     import { DropdownMenu } from "bits-ui";
     import Tooltip from "./ui/Tooltip.svelte";
     import ChevronsLeft from "lucide-svelte/icons/chevrons-left";
@@ -143,9 +142,11 @@
         window.removeEventListener("mouseup", handleWindowMouseUp);
     }
 
-    onDestroy(() => {
-        window.removeEventListener("mousemove", handleWindowMouseMove);
-        window.removeEventListener("mouseup", handleWindowMouseUp);
+    $effect(() => {
+        return () => {
+            window.removeEventListener("mousemove", handleWindowMouseMove);
+            window.removeEventListener("mouseup", handleWindowMouseUp);
+        };
     });
 </script>
 

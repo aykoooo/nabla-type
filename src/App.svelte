@@ -213,7 +213,7 @@
           >
             <SimCanvas
               bind:this={simCanvas}
-              onCanvasClick={handleCanvasFocus}
+              onCanvasDblClick={handleCanvasFocus}
             />
           </ResizableCanvas>
         </PanZoomViewport>
