@@ -55,7 +55,24 @@ export function clearPauseSnapshots() {
 }
 
 
-let defaultState: any = null;
+interface StoredState {
+    params: SimParams;
+    activeColormapId: string;
+    customColorHex: string;
+    customGradientHexes: string[];
+    customGradientStops: GradientStop[];
+    resolution: { width: number; height: number };
+    resolutionLocked: boolean;
+    aspectMode: AspectMode;
+    customAspectRatio: number | null;
+    useParamMaps: boolean;
+    activePresetId: string;
+    seedText: string;
+    seedFontSize: number;
+    targetFps: number;
+}
+
+let defaultState: StoredState | null = null;
 if (typeof window !== "undefined") {
     try {
         const saved = window.localStorage.getItem("nabla-type-state");
@@ -87,7 +104,7 @@ class SimStore {
     seedText: string = $state(defaultState?.seedText ?? 'A')
     seedFontSize: number = $state(defaultState?.seedFontSize ?? 200)
     // Keep as plain field (non-$state) to avoid proxying third-party class instances.
-    seedFont: any | null = null
+    seedFont: unknown | null = null
     seedFontName: string = $state('')
     iterationCount: number = $state(0)
     fps: number = $state(0)

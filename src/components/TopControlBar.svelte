@@ -1,13 +1,13 @@
 <script lang="ts">
     import { store } from "$lib/store/simStore.svelte";
-    import { simController } from "$lib/store/simController";
+    import { simController, type AspectMode } from "$lib/store/simController";
     import Select from "./ui/Select.svelte";
     import Tooltip from "./ui/Tooltip.svelte";
     import MathInput from "./ui/MathInput.svelte";
     import Lock from "lucide-svelte/icons/lock";
     import Unlock from "lucide-svelte/icons/unlock";
 
-    const aspectItems = [
+    const aspectItems: { value: AspectMode; label: string }[] = [
         { value: "free", label: "Free" },
         { value: "1:1", label: "1:1" },
         { value: "4:3", label: "4:3" },
@@ -125,7 +125,7 @@
                     items={aspectItems}
                     value={store.aspectMode}
                     onValueChange={(v) =>
-                        simController.handleAspectMode(v as any)}
+                        simController.handleAspectMode(v as AspectMode)}
                 />
             </div>
         </Tooltip>

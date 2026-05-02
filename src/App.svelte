@@ -5,11 +5,11 @@
   import PanZoomViewport from "./components/PanZoomViewport.svelte";
   import InfoBar from "./components/InfoBar.svelte";
 
-  import TopControlBar from "./components/TopControlBar.svelte";
-  import LeftToolbar from "./components/LeftToolbar.svelte";
-  import BottomTimelineBar from "./components/BottomTimelineBar.svelte";
-  import ParameterPanel from "./components/ParameterPanel.svelte";
-  import SeedPanel from "./components/SeedPanel.svelte";
+import TopControlBar from "./components/TopControlBar.svelte";
+import LeftToolbar from "./components/LeftToolbar.svelte";
+import BottomTimelineBar from "./components/BottomTimelineBar.svelte";
+import ParameterPanel from "./components/ParameterPanel.svelte";
+import SeedPanel from "./components/SeedPanel.svelte";
   import { initStorePersistence } from "$lib/store/simStore.svelte";
   import ColormapPicker from "./components/ColormapPicker.svelte";
   import ExportPanel from "./components/ExportPanel.svelte";
@@ -42,10 +42,6 @@
 
   function getSimulation(): GrayScott | null {
     return simCanvas?.getSimulation() ?? null;
-  }
-
-  function getCanvasElement(): HTMLCanvasElement | null {
-    return simCanvas?.getCanvasElement() ?? null;
   }
 
   // Handle canvas resize from ResizableCanvas handles
@@ -237,7 +233,7 @@
           <SeedPanel bind:this={seedPanel} onReseed={handleReseed} />
         </AccordionPanel>
 
-        <AccordionPanel title="Parameters" open>
+        <AccordionPanel title="Advanced Parameters" open>
           <ParameterPanel />
         </AccordionPanel>
 
@@ -245,8 +241,8 @@
           <ColormapPicker />
         </AccordionPanel>
 
-        <AccordionPanel title="Export" open>
-          <ExportPanel {getSimulation} {getCanvasElement} />
+        <AccordionPanel title="Export">
+          <ExportPanel {getSimulation} />
         </AccordionPanel>
       </div>
     </div>

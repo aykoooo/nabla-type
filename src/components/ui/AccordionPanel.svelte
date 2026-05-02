@@ -1,11 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
 
-  let {
-    title,
-    open = false,
-    children,
-  }: {
+  let { title, open = false, children }: {
     title: string;
     open?: boolean;
     children: Snippet;

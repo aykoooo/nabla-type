@@ -14,7 +14,11 @@
     max?: number;
     decimals?: number;
     suffix?: string;
-    [key: string]: any;
+    onblur?: (e: FocusEvent) => void;
+    onkeydown?: (e: KeyboardEvent) => void;
+    oninput?: (e: Event) => void;
+    onfocus?: (e: FocusEvent) => void;
+    [key: string]: unknown;
   } = $props();
 
   let isFocused = $state(false);

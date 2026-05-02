@@ -201,7 +201,7 @@
   }
 
   // Re-seed with a specific font
-  export function reseedWithFont(font: any) {
+  export function reseedWithFont(font: unknown) {
     if (!sim) return;
     try {
       const imageData = seedGen.renderText(

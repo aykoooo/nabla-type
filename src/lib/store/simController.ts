@@ -2,12 +2,15 @@ import { store } from "./simStore.svelte";
 import { replay } from "./replayStore.svelte";
 import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
 import { cloneParams, findActiveIndex, getPresetById } from "./presetStore";
+import type { GrayScott } from "../simulation/GrayScott";
+
+export type AspectMode = "free" | "1:1" | "4:3" | "16:9" | "custom";
 
 export interface SimCanvasRef {
     reseed: () => void;
-    reseedWithFont: (font: any) => void;
+    reseedWithFont: (font: unknown) => void;
     getCanvasElement: () => HTMLCanvasElement | null;
-    getSimulation: () => any | null; // GrayScott
+    getSimulation: () => GrayScott | null;
     capturePauseSnapshot: () => void;
     restorePauseSnapshot: () => void;
     restoreReplayCursorFrame: () => void;
@@ -51,7 +54,7 @@ class SimController {
         this.handleCanvasResize(adjusted.width, adjusted.height);
     }
 
-    handleAspectMode(mode: "free" | "1:1" | "4:3" | "16:9" | "custom") {
+    handleAspectMode(mode: AspectMode) {
         store.aspectMode = mode;
         store.resolutionLocked = mode !== "free";
         if (mode === "free") store.customAspectRatio = null;
@@ -189,6 +192,7 @@ class SimController {
         store.params.stepsPerFrame = entry.params.stepsPerFrame;
         store.baselineParams = cloneParams(entry.params);
     }
-}
+
+    }
 
 export const simController = new SimController();

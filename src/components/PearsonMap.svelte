@@ -7,7 +7,7 @@
         open: boolean;
     } = $props();
 
-    let dialogEl: HTMLDialogElement;
+    let dialogEl: HTMLDialogElement | null = null;
     let hoverFeed = $state(0);
     let hoverKill = $state(0);
     let hovering = $state(false);

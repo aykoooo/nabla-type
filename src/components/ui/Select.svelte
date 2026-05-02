@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { Select, type WithoutChildren } from "bits-ui";
+    import { Select } from "bits-ui";
     import ChevronDown from "lucide-svelte/icons/chevron-down";
     import Check from "lucide-svelte/icons/check";
+    import type { Snippet } from "svelte";
 
     let {
         value = $bindable<string>(),
@@ -14,7 +15,7 @@
         items: { value: string; label: string }[];
         placeholder?: string;
         class?: string;
-        onValueChange?: (value: string) => void;
+        onValueChange?: (value: string | undefined) => void;
     } = $props();
 
     const selectedLabel = $derived(

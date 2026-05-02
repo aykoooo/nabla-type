@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Tooltip, type WithoutChildren } from "bits-ui";
+    import { Tooltip } from "bits-ui";
     import type { Snippet } from "svelte";
 
     let {
@@ -13,7 +13,7 @@
         children: Snippet;
         delayDuration?: number;
         side?: "top" | "right" | "bottom" | "left";
-        [key: string]: any;
+        [key: string]: unknown;
     } = $props();
 </script>
 
