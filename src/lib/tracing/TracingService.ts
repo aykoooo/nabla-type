@@ -48,8 +48,7 @@ export class TracingService {
         }
     }
 
-    destroy(): void {}
-}
+    }
 
 /** Shared singleton */
 export const tracingService = new TracingService()

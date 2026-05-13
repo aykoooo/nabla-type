@@ -391,22 +391,4 @@ export class GrayScott {
         this.regl.destroy()
     }
 
-    static createOffscreenContext(): any {
-        const canvas = document.createElement('canvas')
-        canvas.width = 1
-        canvas.height = 1
-        const gl = canvas.getContext('webgl', {
-            preserveDrawingBuffer: true,
-            antialias: false,
-        })
-        if (!gl) return null
-
-        const regl = createREGL({
-            gl,
-            extensions: ['OES_texture_float'],
-            optionalExtensions: ['OES_texture_float_linear', 'OES_texture_half_float'],
-        })
-
-        return { regl, gl }
     }
-}

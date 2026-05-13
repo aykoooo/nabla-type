@@ -135,7 +135,7 @@ function applyEnvelope(svgString: string, opts: ExportOptions): string {
 function buildMetadata(m?: ExportMetadata): string[] {
     if (!m) return []
     const L: string[] = ['<!-- Generated in nabla-type -->']
-    if (m.seed) L.push(`<!-- Seed: ${m.seed} -->`)
+    if (m.seed) L.push(`<!-- Seed: ${sanitizeXml(m.seed)} -->`)
     L.push(`<!-- Exported: ${m.timestamp} -->`)
     L.push(`<!-- Resolution: ${m.resolution.width}×${m.resolution.height} -->`)
     L.push(`<!-- Iterations: ${m.iterations} -->`)
@@ -146,6 +146,11 @@ function buildMetadata(m?: ExportMetadata): string[] {
     L.push(`<!-- dt: ${m.simParams.dt.toFixed(4)} -->`)
     L.push(`<!-- turdsize: ${m.tracingParams.turdsize}  alphamax: ${m.tracingParams.alphamax.toFixed(2)}  opttolerance: ${m.tracingParams.opttolerance.toFixed(2)}  optcurve: ${m.tracingParams.optcurve} -->`)
     return L
+}
+
+/** Strip characters that could break XML or inject script */
+function sanitizeXml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/-->/g, '--&gt;')
 }
 
 /** Insert metadata comments between <?xml?> and <svg> */

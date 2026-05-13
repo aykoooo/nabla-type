@@ -7,6 +7,9 @@ export class FontLoader {
      * Load a font from a File (user upload)
      */
     async loadFromFile(file: File): Promise<any> {
+        if (file.size > 10 * 1024 * 1024) {
+            throw new Error('Font file is too large. Maximum size is 10 MB.')
+        }
         const buffer = await file.arrayBuffer()
         this.font = opentype.parse(buffer)
         return this.font
