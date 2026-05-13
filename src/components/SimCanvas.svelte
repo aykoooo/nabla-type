@@ -6,6 +6,7 @@
   import { xmorphia } from "$lib/colormaps/maps/xmorphia";
   import { SeedGenerator } from "$lib/seed/SeedGenerator";
   import type { GradientStop } from "$lib/store/simStore.svelte";
+import type { Font } from "opentype.js";
   import {
     store,
     pushPauseSnapshot,
@@ -201,7 +202,7 @@
   }
 
   // Re-seed with a specific font
-  export function reseedWithFont(font: unknown) {
+  export function reseedWithFont(font: Font | null) {
     if (!sim) return;
     try {
       const imageData = seedGen.renderText(
@@ -355,8 +356,8 @@
         getActiveBoundsSize,
         resizeSimulation,
       });
-    } catch (e: any) {
-      errorMsg = e.message || "Failed to initialize WebGL simulation.";
+    } catch (e) {
+      errorMsg = (e as Error).message || "Failed to initialize WebGL simulation.";
       console.error(e);
     }
   });

@@ -21,7 +21,7 @@ export class TracingService {
         ctx.putImageData(imageData, 0, 0)
 
         // potrace-plus processes the canvas directly
-        const traced: any = await PotracePlus(canvas, {
+        const traced = await PotracePlus(canvas, {
             turdsize: params.turdsize,
             alphamax: params.alphamax,
             opttolerance: params.opttolerance,

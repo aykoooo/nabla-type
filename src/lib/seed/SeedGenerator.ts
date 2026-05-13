@@ -1,11 +1,13 @@
+import type { Font } from 'opentype.js'
+
 export class SeedGenerator {
     measureTextBounds(
         text: string,
-        font: any | null,
+        font: Font | null,
         fontSize: number,
         padding: number = 24
     ): { width: number; height: number } {
-        if (font && font.getPath) {
+        if (font) {
             const path = font.getPath(text || 'A', 0, 0, fontSize)
             const bbox = path.getBoundingBox()
             const width = Math.max(1, Math.ceil((bbox.x2 - bbox.x1) + padding * 2))
@@ -34,7 +36,7 @@ export class SeedGenerator {
      */
     renderText(
         text: string,
-        font: any | null, // opentype.Font or null
+        font: Font | null,
         width: number,
         height: number,
         fontSize: number
@@ -49,7 +51,7 @@ export class SeedGenerator {
         // Draw text in black (glyph = seeded)
         ctx.fillStyle = '#000000'
 
-        if (font && font.draw) {
+        if (font) {
             // opentype.js font path
             const path = font.getPath(text, 0, 0, fontSize)
             const bbox = path.getBoundingBox()
@@ -60,7 +62,7 @@ export class SeedGenerator {
 
             // Draw using opentype path
             const drawPath = font.getPath(text, x, y, fontSize)
-            drawPath.draw(ctx as any)
+            drawPath.draw(ctx as any) // OffscreenCanvasRenderingContext2D vs CanvasRenderingContext2D mismatch
             ctx.fill()
         } else {
             // Canvas 2D default font fallback

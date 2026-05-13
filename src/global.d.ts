@@ -11,27 +11,24 @@ declare module '*.frag?raw' {
     export default src
 }
 
-declare module 'regl' {
-    const createREGL: any
-    export default createREGL
-    export type Regl = any
-    export type Framebuffer2D = any
-    export type Texture2D = any
-    export type DrawCommand = any
-}
-
 declare module 'potrace-plus' {
+    interface PathCommand {
+        command: string
+        args: number[]
+    }
+
     interface TracedResult {
         readonly svg: string
         readonly svgSplit: string
         readonly d: string
+        readonly pathData: PathCommand[]
+        readonly pathDataNorm: PathCommand[]
         readonly width: number
         readonly height: number
-        readonly commands: number
         getSVG(split?: boolean): string
         getD(): string
-        getPathData(): unknown[]
-        getPathDataNorm(): unknown[]
+        getPathData(): PathCommand[]
+        getPathDataNorm(): PathCommand[]
     }
 
     interface PotracePlusOptions {
@@ -48,23 +45,11 @@ declare module 'potrace-plus' {
         toShorthands?: boolean
         getPolygon?: boolean
         getPDF?: boolean
+        useWorker?: boolean
     }
 
     export function PotracePlus(
         source: Blob | HTMLImageElement | HTMLCanvasElement | HTMLSvgElement | string,
         options?: PotracePlusOptions
     ): Promise<TracedResult>
-
-    // Internal utilities re-exported (unused by us)
-    export var Bitmap: unknown
-}
-
-declare module 'opentype.js' {
-    const opentype: any
-    export default opentype
-    export type Font = any
-}
-
-declare module 'd3-contour' {
-    export function contours(): any
 }

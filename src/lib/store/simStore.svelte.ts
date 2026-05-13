@@ -1,4 +1,5 @@
 import { DEFAULT_PRESETS, type PresetEntry, type SimParams } from '$lib/simulation/presets'
+import type { Font } from 'opentype.js'
 
 export type AspectMode = 'free' | '1:1' | '4:3' | '16:9' | 'custom'
 
@@ -24,7 +25,7 @@ export interface PauseSnapshot {
     activePresetId: string
     seedText: string
     seedFontSize: number
-    seedFont: any | null
+    seedFont: Font | null
     seedFontName: string
     targetFps: number
 }
@@ -104,7 +105,7 @@ class SimStore {
     seedText: string = $state(defaultState?.seedText ?? 'A')
     seedFontSize: number = $state(defaultState?.seedFontSize ?? 200)
     // Keep as plain field (non-$state) to avoid proxying third-party class instances.
-    seedFont: unknown | null = null
+    seedFont: Font | null = null
     seedFontName: string = $state('')
     iterationCount: number = $state(0)
     fps: number = $state(0)

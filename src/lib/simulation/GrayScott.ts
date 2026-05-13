@@ -4,23 +4,33 @@ import quadVertSrc from './shaders/quad.vert?raw'
 import simFragSrc from './shaders/simulation.frag?raw'
 import displayFragSrc from './shaders/display.frag?raw'
 
+type ReglInstance = ReturnType<typeof createREGL>
+type ReglTexture2D = ReturnType<ReglInstance['texture']>
+type ReglFramebuffer2D = ReturnType<ReglInstance['framebuffer']>
+// Framebuffer2D from regl types lacks the runtime `color` property
+// (array of color attachment textures). Extend with what the code uses.
+type ReglFBO = ReglFramebuffer2D & { color: ReglTexture2D[] }
+// Draw commands use regl.prop() for dynamic property binding — their generic
+// signatures can't be fully typed statically without replicating regl internals.
+type ReglDrawCommand = any
+
 export class GrayScott {
-    private regl: any
+    private regl: ReglInstance
     private width: number
     private height: number
 
-    private pingTex: any
-    private pongTex: any
-    private pingFBO: any
-    private pongFBO: any
+    private pingTex: ReglTexture2D
+    private pongTex: ReglTexture2D
+    private pingFBO: ReglFBO
+    private pongFBO: ReglFBO
     private ping = true // true = read from pingFBO, write to pongFBO
 
-    private feedMapTex: any
-    private killMapTex: any
-    private colormapTex: any
+    private feedMapTex: ReglTexture2D
+    private killMapTex: ReglTexture2D
+    private colormapTex: ReglTexture2D
 
-    private simCmd: any
-    private displayCmd: any
+    private simCmd: ReglDrawCommand
+    private displayCmd: ReglDrawCommand
 
     constructor(canvas: HTMLCanvasElement, width: number, height: number) {
         this.width = width
@@ -46,8 +56,8 @@ export class GrayScott {
         // Create ping-pong textures and framebuffers
         this.pingTex = this.createFloatTexture(width, height)
         this.pongTex = this.createFloatTexture(width, height)
-        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false })
-        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false })
+        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
+        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
 
         // Create 1x1 param map placeholders
         this.feedMapTex = this.regl.texture({
@@ -89,49 +99,51 @@ export class GrayScott {
         this.displayCmd = this.createDisplayCommand()
     }
 
-    private createSimCommand(): any {
-        return this.regl({
+    private createSimCommand(): ReglDrawCommand {
+        const regl = this.regl as any
+        return regl({
             vert: quadVertSrc,
             frag: simFragSrc,
             attributes: {
                 position: [[-1, -1], [1, -1], [-1, 1], [-1, 1], [1, -1], [1, 1]],
             },
             uniforms: {
-                u_state: this.regl.prop('u_state'),
+                u_state: regl.prop('u_state'),
                 u_resolution: [this.width, this.height],
-                u_feed: this.regl.prop('u_feed'),
-                u_kill: this.regl.prop('u_kill'),
-                u_da: this.regl.prop('u_da'),
-                u_db: this.regl.prop('u_db'),
-                u_dt: this.regl.prop('u_dt'),
+                u_feed: regl.prop('u_feed'),
+                u_kill: regl.prop('u_kill'),
+                u_da: regl.prop('u_da'),
+                u_db: regl.prop('u_db'),
+                u_dt: regl.prop('u_dt'),
                 u_feedMap: this.feedMapTex,
                 u_killMap: this.killMapTex,
                 u_useParamMaps: false,
             },
-            framebuffer: this.regl.prop('framebuffer'),
+            framebuffer: regl.prop('framebuffer'),
             count: 6,
             depth: { enable: false },
         })
     }
 
-    private createDisplayCommand(): any {
-        return this.regl({
+    private createDisplayCommand(): ReglDrawCommand {
+        const regl = this.regl as any
+        return regl({
             vert: quadVertSrc,
             frag: displayFragSrc,
             attributes: {
                 position: [[-1, -1], [1, -1], [-1, 1], [-1, 1], [1, -1], [1, 1]],
             },
             uniforms: {
-                u_state: this.regl.prop('u_state'),
+                u_state: regl.prop('u_state'),
                 u_colormap: this.colormapTex,
-                u_useLUT: this.regl.prop('u_useLUT'),
+                u_useLUT: regl.prop('u_useLUT'),
             },
             count: 6,
             depth: { enable: false },
         })
     }
 
-    private createFloatTexture(width: number, height: number): any {
+    private createFloatTexture(width: number, height: number): ReglTexture2D {
         return this.regl.texture({
             width, height,
             format: 'rgba',
@@ -285,8 +297,8 @@ export class GrayScott {
 
         this.pingTex = this.createFloatTexture(width, height)
         this.pongTex = this.createFloatTexture(width, height)
-        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false })
-        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false })
+        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
+        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
 
         // Build new data: copy old pixels into the center, fill rest with A=1, B=0
         const newData = new Float32Array(width * height * 4)

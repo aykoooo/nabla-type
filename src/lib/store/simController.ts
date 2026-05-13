@@ -3,12 +3,13 @@ import { replay } from "./replayStore.svelte";
 import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
 import { cloneParams, findActiveIndex, getPresetById } from "./presetStore";
 import type { GrayScott } from "../simulation/GrayScott";
+import type { Font } from "opentype.js";
 
 export type AspectMode = "free" | "1:1" | "4:3" | "16:9" | "custom";
 
 export interface SimCanvasRef {
     reseed: () => void;
-    reseedWithFont: (font: unknown) => void;
+    reseedWithFont: (font: Font) => void;
     getCanvasElement: () => HTMLCanvasElement | null;
     getSimulation: () => GrayScott | null;
     capturePauseSnapshot: () => void;
