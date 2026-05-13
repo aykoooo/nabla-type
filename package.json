@@ -2,7 +2,7 @@
   "name": "nabla-type",
   "private": true,
   "version": "0.1.0",
-  "description": "Reaction-diffusion typography playground built with Svelte, WebGL2, and VTracer.",
+  "description": "Reaction-diffusion typography playground built with Svelte, WebGL1, and potrace-plus.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -30,8 +30,6 @@
   },
   "dependencies": {
     "bits-ui": "^2.16.3",
-    "d3-contour": "^4.0.2",
-    "idb": "^8.0.3",
     "lucide-svelte": "^1.0.1",
     "opentype.js": "^1.3.4",
     "potrace-plus": "^0.1.3",
