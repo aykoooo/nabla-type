@@ -23,5 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
+.vite/
+*.tsbuildinfo
+
 .opencode/
 .claude/
