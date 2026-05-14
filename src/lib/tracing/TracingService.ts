@@ -42,7 +42,7 @@ export class TracingService {
         return {
             svg: traced.svg ?? '',
             svgSplit: traced.svgSplit ?? '',
-            pathDataNorm: (traced.pathData as unknown as PathCommand[]) ?? [],
+            pathDataNorm: traced.pathDataNorm ?? [],
             width: traced.width as number,
             height: traced.height as number,
         }
