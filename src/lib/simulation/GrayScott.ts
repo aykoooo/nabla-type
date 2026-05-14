@@ -178,38 +178,6 @@ export class GrayScott {
     }
 
     /**
-     * Replace current simulation state with a seed texture.
-     * Black pixels (value <= 128) → A=0.5, B=0.25 (seeded reaction)
-     * White pixels (value > 128) → A=1.0, B=0.0 (no reaction)
-     */
-    injectSeed(imageData: ImageData): void {
-        const data = new Float32Array(this.width * this.height * 4)
-        for (let i = 0; i < this.width * this.height; i++) {
-            const brightness = imageData.data[i * 4]
-            if (brightness <= 128) {
-                data[i * 4 + 0] = 0.5   // A
-                data[i * 4 + 1] = 0.25  // B
-            } else {
-                data[i * 4 + 0] = 1.0   // A
-                data[i * 4 + 1] = 0.0   // B
-            }
-            data[i * 4 + 2] = 0.0
-            data[i * 4 + 3] = 1.0
-        }
-        this.pingTex({
-            width: this.width, height: this.height,
-            data, format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
-        this.pongTex({
-            width: this.width, height: this.height,
-            data, format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
-        this.ping = true
-    }
-
-    /**
      * Inject seed from a Float32Array directly (from SeedGenerator.imageDataToSimState)
      */
     injectSeedFloat(data: Float32Array): void {
