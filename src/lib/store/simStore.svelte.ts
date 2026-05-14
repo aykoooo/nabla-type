@@ -78,7 +78,7 @@ if (typeof window !== "undefined") {
     try {
         const saved = window.localStorage.getItem("nabla-type-state");
         if (saved) defaultState = JSON.parse(saved);
-    } catch(e) {}
+    } catch(e) { console.warn('Failed to load saved state from localStorage:', e) }
 }
 
 // Use an object wrapper so all state is mutable from outside the module
@@ -138,7 +138,7 @@ export function initStorePersistence() {
             };
             try {
                 window.localStorage.setItem("nabla-type-state", JSON.stringify(state));
-            } catch(e) {}
+            } catch(e) { console.warn('Failed to persist state to localStorage:', e) }
         });
     });
     return cleanup;

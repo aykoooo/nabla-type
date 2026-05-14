@@ -21,30 +21,41 @@ export class TracingService {
         ctx.putImageData(imageData, 0, 0)
 
         // potrace-plus processes the canvas directly
-        const traced = await PotracePlus(canvas, {
-            turdsize: params.turdsize,
-            alphamax: params.alphamax,
-            opttolerance: params.opttolerance,
-            optcurve: params.optcurve,
-            turnpolicy: params.turnpolicy,
+        try {
+            const traced = await PotracePlus(canvas, {
+                turdsize: params.turdsize,
+                alphamax: params.alphamax,
+                opttolerance: params.opttolerance,
+                optcurve: params.optcurve,
+                turnpolicy: params.turnpolicy,
 
-            useWorker: false,
-            optimize: true,
-            crop: false,
-            decimals: 2,
-            addDimensions: false,
-            toRelative: false,
-            toShorthands: false,
-            getPolygon: false,
-            getPDF: false,
-        })
+                useWorker: false,
+                optimize: true,
+                crop: false,
+                decimals: 2,
+                addDimensions: false,
+                toRelative: false,
+                toShorthands: false,
+                getPolygon: false,
+                getPDF: false,
+            })
 
-        return {
-            svg: traced.svg ?? '',
-            svgSplit: traced.svgSplit ?? '',
-            pathDataNorm: traced.pathDataNorm ?? [],
-            width: traced.width as number,
-            height: traced.height as number,
+            return {
+                svg: traced.svg ?? '',
+                svgSplit: traced.svgSplit ?? '',
+                pathDataNorm: traced.pathDataNorm ?? [],
+                width: traced.width as number,
+                height: traced.height as number,
+            }
+        } catch (e) {
+            console.warn('PotracePlus tracing failed:', e)
+            return {
+                svg: '',
+                svgSplit: '',
+                pathDataNorm: [],
+                width: imageData.width,
+                height: imageData.height,
+            }
         }
     }
 

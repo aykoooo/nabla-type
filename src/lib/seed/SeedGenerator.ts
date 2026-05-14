@@ -16,7 +16,8 @@ export class SeedGenerator {
         }
 
         const canvas = new OffscreenCanvas(1, 1)
-        const ctx = canvas.getContext('2d')!
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return { width: 1, height: 1 }
         ctx.font = `bold ${fontSize}px sans-serif`
         const metrics = ctx.measureText(text || 'A')
         const textWidth = metrics.width
@@ -42,7 +43,10 @@ export class SeedGenerator {
         fontSize: number
     ): ImageData {
         const canvas = new OffscreenCanvas(width, height)
-        const ctx = canvas.getContext('2d')!
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+            return new ImageData(width, height)
+        }
 
         // Fill with white (background = no reaction)
         ctx.fillStyle = '#ffffff'
