@@ -25,7 +25,7 @@ export class SimLoopManager {
         this.isLooping = true;
         this.lastFrameTime = 0;
         this.lastParamsKey = this.buildParamsKey();
-        this.animFrameId = requestAnimationFrame(this.loop.bind(this));
+        this.animFrameId = requestAnimationFrame(this.loop);
     }
 
     stop() {
@@ -53,7 +53,7 @@ export class SimLoopManager {
         });
     }
 
-    private loop(timestamp: number) {
+    private loop = (timestamp: number) => {
         if (!this.sim) return;
         let didSimAdvance = false;
 
@@ -107,7 +107,7 @@ export class SimLoopManager {
         }
 
         if (this.isLooping) {
-            this.animFrameId = requestAnimationFrame(this.loop.bind(this));
+            this.animFrameId = requestAnimationFrame(this.loop);
         }
     }
 }
