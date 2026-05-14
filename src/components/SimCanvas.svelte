@@ -337,6 +337,20 @@ import type { Font } from "opentype.js";
         canvasEl,
         store.resolution.width,
         store.resolution.height,
+        {
+          onContextLost: () => {
+            console.warn('WebGL context lost — simulation paused');
+            loopManager.stop();
+          },
+          onContextRestored: () => {
+            console.log('WebGL context restored — reinitializing simulation');
+            // Re-upload colormap and current state
+            uploadCurrentColormap();
+            // Re-seed with current text to get a valid starting state
+            reseed();
+            loopManager.start(sim!);
+          },
+        }
       );
 
       uploadCurrentColormap();

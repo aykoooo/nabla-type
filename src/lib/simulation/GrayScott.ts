@@ -14,6 +14,11 @@ type ReglFBO = ReglFramebuffer2D & { color: ReglTexture2D[] }
 // signatures can't be fully typed statically without replicating regl internals.
 type ReglDrawCommand = any
 
+export interface ContextCallbacks {
+    onContextLost?: (e: Event) => void
+    onContextRestored?: (e: Event) => void
+}
+
 export class GrayScott {
     private regl: ReglInstance
     private width: number
@@ -32,9 +37,19 @@ export class GrayScott {
     private simCmd: ReglDrawCommand
     private displayCmd: ReglDrawCommand
 
-    constructor(canvas: HTMLCanvasElement, width: number, height: number) {
+    private contextLostCallback: ((e: Event) => void) | null = null
+    private contextRestoredCallback: ((e: Event) => void) | null = null
+    private canvasEl: HTMLCanvasElement
+
+    constructor(canvas: HTMLCanvasElement, width: number, height: number, callbacks?: ContextCallbacks) {
         this.width = width
         this.height = height
+        this.canvasEl = canvas
+        this.contextLostCallback = callbacks?.onContextLost ?? null
+        this.contextRestoredCallback = callbacks?.onContextRestored ?? null
+
+        canvas.addEventListener('webglcontextlost', this.handleContextLost as EventListener)
+        canvas.addEventListener('webglcontextrestored', this.handleContextRestored as EventListener)
 
         // Force WebGL1 context so OES_texture_float extension is available.
         // In WebGL2, OES_texture_float returns null (it's core) but regl
@@ -360,7 +375,27 @@ export class GrayScott {
         return this.height
     }
 
+    private handleContextLost = (e: Event) => {
+        e.preventDefault()
+        this.contextLostCallback?.(e)
+    }
+
+    private handleContextRestored = (e: Event) => {
+        this.pingTex = this.createFloatTexture(this.width, this.height)
+        this.pongTex = this.createFloatTexture(this.width, this.height)
+        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
+        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
+
+        this.clearState()
+        this.simCmd = this.createSimCommand()
+        this.displayCmd = this.createDisplayCommand()
+
+        this.contextRestoredCallback?.(e)
+    }
+
     destroy(): void {
+        this.canvasEl.removeEventListener('webglcontextlost', this.handleContextLost as EventListener)
+        this.canvasEl.removeEventListener('webglcontextrestored', this.handleContextRestored as EventListener)
         this.pingTex.destroy()
         this.pongTex.destroy()
         this.pingFBO.destroy()
