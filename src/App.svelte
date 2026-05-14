@@ -59,38 +59,6 @@ import SeedPanel from "./components/SeedPanel.svelte";
     lastHeight = clamped.height;
   }
 
-  function handleManualResolution(w: number, h: number, basis: "width" | "height" | "max" = "max") {
-    const adjusted = applyAspect(
-      w,
-      h,
-      store.aspectMode,
-      store.resolutionLocked,
-      basis,
-    );
-    handleCanvasResize(adjusted.width, adjusted.height);
-  }
-
-  function handleAspectMode(mode: "free" | "1:1" | "4:3" | "16:9") {
-    store.aspectMode = mode;
-    store.resolutionLocked = mode !== "free";
-    const current = applyAspect(
-      store.resolution.width,
-      store.resolution.height,
-      store.aspectMode,
-      store.resolutionLocked,
-      "max",
-    );
-    handleCanvasResize(current.width, current.height);
-  }
-
-  function handleResolutionLock(locked: boolean) {
-    store.resolutionLocked = locked;
-  }
-
-  function handleTargetFps(value: number) {
-    store.targetFps = Math.max(0, Math.min(240, Math.round(value)));
-  }
-
   // Check for resolution changes from other sources (e.g. export panel)
   $effect(() => {
     const w = store.resolution.width;

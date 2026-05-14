@@ -140,7 +140,7 @@ class SimController {
         }
     }
 
-    handleReplayStep(delta: number) {
+    private shiftReplayCursor(delta: number) {
         if (store.isRunning) {
             store.isRunning = false;
         }
@@ -148,12 +148,12 @@ class SimController {
         this.canvasRef?.restoreReplayCursorFrame();
     }
 
+    handleReplayStep(delta: number) {
+        this.shiftReplayCursor(delta);
+    }
+
     handleReplayJump(delta: number) {
-        if (store.isRunning) {
-            store.isRunning = false;
-        }
-        replay.step(delta);
-        this.canvasRef?.restoreReplayCursorFrame();
+        this.shiftReplayCursor(delta);
     }
 
     handleReplaySeek(index: number) {
