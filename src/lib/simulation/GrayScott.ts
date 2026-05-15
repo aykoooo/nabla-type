@@ -96,7 +96,7 @@ export class GrayScott {
             },
             uniforms: {
                 u_state: regl.prop('u_state'),
-                u_resolution: [this.width, this.height],
+                u_pixelSize: [1.0 / this.width, 1.0 / this.height],
                 u_feed: regl.prop('u_feed'),
                 u_kill: regl.prop('u_kill'),
                 u_da: regl.prop('u_da'),
@@ -209,26 +209,36 @@ export class GrayScott {
     }
 
     /**
-     * Step the simulation N times per call
+     * Step the simulation N times per call.
+     * Ping-pong loop unrolled to reduce JS overhead and branch mispredictions.
      */
-    step(params: SimParams): void {
-        const steps = Math.max(1, Math.min(16, Math.round(params.stepsPerFrame)))
-        for (let i = 0; i < steps; i++) {
-            const src = this.ping ? this.pingFBO : this.pongFBO
-            const dst = this.ping ? this.pongFBO : this.pingFBO
+    step(params: SimParams, steps?: number): void {
+        // Caller passes pre-clamped value; avoid re-clamping every frame.
+        const n = steps ?? Math.max(1, Math.min(16, Math.round(params.stepsPerFrame)));
+        const feed = params.feed;
+        const kill = params.kill;
+        const da = params.da;
+        const db = params.db;
+        const dt = params.dt;
+
+        let ping = this.ping;
+        for (let i = 0; i < n; i++) {
+            const src = ping ? this.pingFBO : this.pongFBO;
+            const dst = ping ? this.pongFBO : this.pingFBO;
 
             this.simCmd({
-                u_state: src.color[0],
-                u_feed: params.feed,
-                u_kill: params.kill,
-                u_da: params.da,
-                u_db: params.db,
-                u_dt: params.dt,
+                u_state: (src as ReglFBO).color[0],
+                u_feed: feed,
+                u_kill: kill,
+                u_da: da,
+                u_db: db,
+                u_dt: dt,
                 framebuffer: dst,
-            })
+            });
 
-            this.ping = !this.ping
+            ping = !ping;
         }
+        this.ping = ping;
     }
 
     /**

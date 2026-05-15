@@ -13,18 +13,43 @@ export class SimLoopManager {
     private fpsAccumulator = 0;
     private simAccumulatorMs = 0;
     private captureAccumulatorMs = 0;
-    private lastParamsKey = "";
 
-    private buildParamsKey(): string {
+    // Cached param values for change detection (avoids allocating a string key every frame)
+    private _lastFeed = 0;
+    private _lastKill = 0;
+    private _lastDa = 0;
+    private _lastDb = 0;
+    private _lastDt = 0;
+    private _lastSteps = 0;
+
+    private paramsChanged(): boolean {
         const p = store.params;
-        return `${p.feed}|${p.kill}|${p.da}|${p.db}|${p.dt}|${Math.round(p.stepsPerFrame)}`;
+        const steps = Math.round(p.stepsPerFrame);
+        return (
+            p.feed !== this._lastFeed ||
+            p.kill !== this._lastKill ||
+            p.da !== this._lastDa ||
+            p.db !== this._lastDb ||
+            p.dt !== this._lastDt ||
+            steps !== this._lastSteps
+        );
+    }
+
+    private saveParams() {
+        const p = store.params;
+        this._lastFeed = p.feed;
+        this._lastKill = p.kill;
+        this._lastDa = p.da;
+        this._lastDb = p.db;
+        this._lastDt = p.dt;
+        this._lastSteps = Math.round(p.stepsPerFrame);
     }
 
     start(sim: GrayScott) {
         this.sim = sim;
         this.isLooping = true;
         this.lastFrameTime = 0;
-        this.lastParamsKey = this.buildParamsKey();
+        this.saveParams();
         this.animFrameId = requestAnimationFrame(this.loop);
     }
 
@@ -75,8 +100,7 @@ export class SimLoopManager {
         const targetFps = Math.max(0, Math.round(store.targetFps));
         const simInterval = targetFps > 0 ? 1000 / targetFps : 0;
         const shouldSimStep = simInterval === 0 || this.simAccumulatorMs >= simInterval;
-        const paramsKey = this.buildParamsKey();
-        const paramsChanged = paramsKey !== this.lastParamsKey;
+        const paramsChanged = this.paramsChanged();
 
         if (store.isRunning && (shouldSimStep || paramsChanged)) {
             if (simInterval > 0) {
@@ -86,13 +110,13 @@ export class SimLoopManager {
             }
             const clampedSteps = Math.max(1, Math.min(16, Math.round(store.params.stepsPerFrame)));
 
-            // Advance simulation
-            this.sim.step(store.params);
+            // Advance simulation — pass pre-clamped step count to avoid redundant clamping in step()
+            this.sim.step(store.params, clampedSteps);
             didSimAdvance = true;
             store.iterationCount += clampedSteps;
         }
 
-        this.lastParamsKey = paramsKey;
+        if (paramsChanged) this.saveParams();
 
         this.sim.render(store.activeColormapId !== "blackwhite");
 

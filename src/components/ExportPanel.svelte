@@ -83,35 +83,14 @@
 
       exportStatus = 'Preparing mask…'
 
-      // Build RGBA buffer from WebGL framebuffer (G channel = chemical B).
-      // Flip Y — WebGL origin is bottom-left.
-      const mask = new Uint8Array(width * height * 4)
-
-      // Contrast-stretch pass
-      let minVal = 255, maxVal = 0
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const v = pixels[((height - 1 - y) * width + x) * 4 + 1]
-          if (v < minVal) minVal = v
-          if (v > maxVal) maxVal = v
-        }
-      }
-      const range = Math.max(1, maxVal - minVal)
-
-      // Fill mask
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const srcIdx = ((height - 1 - y) * width + x) * 4
-          const dstIdx = (y * width + x) * 4
-          const g = Math.round(((pixels[srcIdx + 1] - minVal) / range) * 255)
-          mask[dstIdx] = mask[dstIdx + 1] = mask[dstIdx + 2] = g
-          mask[dstIdx + 3] = 255
-        }
-      }
+      // Merged single-pass: Y-flip + contrast-stretch + threshold + invert
+      const imageData = prepareBinaryMask(pixels, width, height, {
+        threshold: Number(threshold),
+        yFlip: true,
+        contrastStretch: true,
+      })
 
       exportStatus = 'Tracing with potrace…'
-
-      const imageData = prepareBinaryMask(mask, width, height, Number(threshold))
 
       const params: TracingParams = {
         turdsize,

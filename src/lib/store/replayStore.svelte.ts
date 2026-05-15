@@ -11,68 +11,118 @@ export interface ReplayFrame {
 }
 
 class ReplayStore {
-    frames: ReplayFrame[] = $state([])
+    // --- public state (same API as before) ---
+    frames: readonly ReplayFrame[] = $state([])
     cursor: number = $state(-1)
     captureFps: number = $state(15)
     maxFramesBack: number = $state(180)
-    private nextId = 1
 
-    private trimToWindow(nextFrames: ReplayFrame[]): ReplayFrame[] {
-        const next = [...nextFrames]
-        const maxFrames = Math.max(2, Math.round(this.maxFramesBack))
-        while (next.length > maxFrames) {
-            next.shift()
-            if (this.cursor > 0) {
-                this.cursor -= 1
-            } else if (this.cursor === 0) {
-                this.cursor = -1
-            }
+    // --- internal ring buffer ---
+    private _ring: ReplayFrame[] = []
+    private _head = 0       // index of oldest frame in _ring
+    private _count = 0      // number of active frames
+    private _nextId = 1
+
+    private _ordered(): ReplayFrame[] {
+        const out: ReplayFrame[] = new Array(this._count)
+        const cap = this._ring.length
+        for (let i = 0; i < this._count; i++) {
+            out[i] = this._ring[(this._head + i) % cap]
         }
-        return next
+        return out
+    }
+
+    private _setOrdered(ordered: ReplayFrame[]) {
+        this.frames = ordered
     }
 
     clear(): void {
+        this._ring = []
+        this._head = 0
+        this._count = 0
+        this._nextId = 1
         this.frames = []
         this.cursor = -1
-        this.nextId = 1
     }
 
     truncate(index: number): void {
-        if (index < 0 || index >= this.frames.length) return
-        this.frames = this.frames.slice(0, index + 1)
-        this.cursor = this.frames.length - 1
+        if (index < 0 || index >= this._count) return
+        const keep = index + 1
+        const cap = this._ring.length
+        const newRing: ReplayFrame[] = new Array(cap)
+        for (let i = 0; i < keep; i++) {
+            newRing[i] = this._ring[(this._head + i) % cap]
+        }
+        this._ring = newRing
+        this._head = 0
+        this._count = keep
+        this._setOrdered(this._ordered())
+        this.cursor = this._count - 1
     }
 
     addFrame(payload: Omit<ReplayFrame, 'id'>): void {
-        const wasAtTail = this.isAtLatest()
-        const frame: ReplayFrame = {
-            ...payload,
-            id: this.nextId++,
+        const cap = this._ring.length
+        const max = Math.max(2, Math.round(this.maxFramesBack))
+
+        if (cap !== max) {
+            // Resize ring buffer lazily
+            const newRing: ReplayFrame[] = new Array(max)
+            for (let i = 0; i < this._count; i++) {
+                newRing[i] = this._ring[(this._head + i) % Math.max(cap, 1)]
+            }
+            this._ring = newRing
+            this._head = 0
         }
 
-        this.frames = this.trimToWindow([...this.frames, frame])
+        const wasAtTail = this.isAtLatest()
+        const frame: ReplayFrame = { ...payload, id: this._nextId++ }
+
+        if (this._count < this._ring.length) {
+            // Append without eviction
+            this._ring[(this._head + this._count) % this._ring.length] = frame
+            this._count++
+        } else {
+            // Overwrite oldest
+            this._ring[this._head] = frame
+            this._head = (this._head + 1) % this._ring.length
+        }
+
+        this._setOrdered(this._ordered())
 
         if (wasAtTail || this.cursor < 0) {
-            this.cursor = this.frames.length - 1
+            this.cursor = this._count - 1
         }
     }
 
     setMaxFramesBack(value: number): void {
-        this.maxFramesBack = Math.max(2, Math.round(value))
-        this.frames = this.trimToWindow(this.frames)
-        if (this.frames.length === 0) {
+        const oldOrdered = this._ordered()
+        const max = Math.max(2, Math.round(value))
+        this.maxFramesBack = max
+
+        const newRing: ReplayFrame[] = new Array(max)
+        const keep = Math.min(oldOrdered.length, max)
+        for (let i = 0; i < keep; i++) {
+            newRing[i] = oldOrdered[oldOrdered.length - keep + i]
+        }
+
+        this._ring = newRing
+        this._head = 0
+        this._count = keep
+        this._setOrdered(this._ordered())
+
+        if (this._count === 0) {
             this.cursor = -1
             return
         }
-        this.cursor = Math.max(0, Math.min(this.frames.length - 1, this.cursor))
+        this.cursor = Math.max(0, Math.min(this._count - 1, this.cursor))
     }
 
     setCursor(index: number): void {
-        if (this.frames.length === 0) {
+        if (this._count === 0) {
             this.cursor = -1
             return
         }
-        this.cursor = Math.max(0, Math.min(this.frames.length - 1, Math.round(index)))
+        this.cursor = Math.max(0, Math.min(this._count - 1, Math.round(index)))
     }
 
     step(delta: number): void {
@@ -80,12 +130,13 @@ class ReplayStore {
     }
 
     isAtLatest(): boolean {
-        return this.frames.length > 0 && this.cursor === this.frames.length - 1
+        return this._count > 0 && this.cursor === this._count - 1
     }
 
     getCurrentFrame(): ReplayFrame | null {
-        if (this.cursor < 0 || this.cursor >= this.frames.length) return null
-        return this.frames[this.cursor]
+        if (this.cursor < 0 || this.cursor >= this._count) return null
+        const cap = this._ring.length
+        return this._ring[(this._head + this.cursor) % cap]
     }
 }
 

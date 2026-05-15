@@ -327,17 +327,23 @@ import type { Font } from "opentype.js";
     }
   }
 
-  // Upload colormap only when selection changes
+  // Upload colormap immediately when selection changes
   $effect(() => {
     store.activeColormapId;
     uploadCurrentColormap();
   });
 
+  // Debounce custom gradient upload during drag to avoid GPU spam
+  let colormapDebounceTimer: ReturnType<typeof setTimeout>;
   $effect(() => {
     store.customGradientStops;
-    if (store.activeColormapId === "custom") {
-      uploadCurrentColormap();
-    }
+    clearTimeout(colormapDebounceTimer);
+    colormapDebounceTimer = setTimeout(() => {
+      if (store.activeColormapId === "custom") {
+        uploadCurrentColormap();
+      }
+    }, 50);
+    return () => clearTimeout(colormapDebounceTimer);
   });
 
   onMount(() => {
@@ -390,6 +396,7 @@ import type { Font } from "opentype.js";
     loopManager.stop();
     sim?.destroy();
     sim = null;
+    clearTimeout(colormapDebounceTimer);
   });
 </script>
 

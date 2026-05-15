@@ -1,7 +1,7 @@
 precision highp float;
 
 uniform sampler2D u_state;
-uniform vec2 u_resolution;
+uniform vec2 u_pixelSize;
 uniform float u_feed;
 uniform float u_kill;
 uniform float u_da;
@@ -14,23 +14,23 @@ uniform bool u_useParamMaps;
 varying vec2 uv;
 
 void main() {
-  vec2 texel = 1.0 / u_resolution;
+  vec2 px = u_pixelSize;
 
   // Sample 3x3 neighborhood
   vec4 center = texture2D(u_state, uv);
-  vec4 n      = texture2D(u_state, uv + vec2( 0.0,  texel.y));
-  vec4 s      = texture2D(u_state, uv + vec2( 0.0, -texel.y));
-  vec4 e      = texture2D(u_state, uv + vec2( texel.x,  0.0));
-  vec4 w      = texture2D(u_state, uv + vec2(-texel.x,  0.0));
-  vec4 ne     = texture2D(u_state, uv + vec2( texel.x,  texel.y));
-  vec4 nw     = texture2D(u_state, uv + vec2(-texel.x,  texel.y));
-  vec4 se     = texture2D(u_state, uv + vec2( texel.x, -texel.y));
-  vec4 sw     = texture2D(u_state, uv + vec2(-texel.x, -texel.y));
+  vec4 n      = texture2D(u_state, uv + vec2( 0.0,  px.y));
+  vec4 s      = texture2D(u_state, uv + vec2( 0.0, -px.y));
+  vec4 e      = texture2D(u_state, uv + vec2( px.x,  0.0));
+  vec4 w      = texture2D(u_state, uv + vec2(-px.x,  0.0));
+  vec4 ne     = texture2D(u_state, uv + vec2( px.x,  px.y));
+  vec4 nw     = texture2D(u_state, uv + vec2(-px.x,  px.y));
+  vec4 se     = texture2D(u_state, uv + vec2( px.x, -px.y));
+  vec4 sw     = texture2D(u_state, uv + vec2(-px.x, -px.y));
 
   float A = center.r;
   float B = center.g;
 
-  // Laplacian with 3x3 kernel
+  // Laplacian with 3x3 kernel (weights chosen to allow dt=1 with da=1, db=0.5)
   float lapA = -1.0 * A
     + 0.2 * (n.r + s.r + e.r + w.r)
     + 0.05 * (ne.r + nw.r + se.r + sw.r);

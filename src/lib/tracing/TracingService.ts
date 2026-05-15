@@ -29,7 +29,6 @@ export class TracingService {
                 optcurve: params.optcurve,
                 turnpolicy: params.turnpolicy,
 
-                useWorker: false,
                 optimize: true,
                 crop: false,
                 decimals: 2,
