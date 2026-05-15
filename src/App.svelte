@@ -20,6 +20,7 @@ import SeedPanel from "./components/SeedPanel.svelte";
   import { store } from "$lib/store/simStore.svelte";
   import { replay } from "$lib/store/replayStore.svelte";
   import { simController } from "$lib/store/simController";
+  import { loadPresets } from "$lib/store/presetStore";
   import { onMount, onDestroy } from "svelte";
   import { Tooltip } from "bits-ui";
 
@@ -133,6 +134,8 @@ import SeedPanel from "./components/SeedPanel.svelte";
       centerCanvas: () => panZoomViewport?.centerCanvas(),
       getScale: () => panZoomViewport?.getScale() ?? 1,
     });
+    store.presets = loadPresets();
+    simController.applyPresetById(store.activePresetId);
   });
 
   onDestroy(() => {

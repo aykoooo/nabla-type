@@ -258,6 +258,9 @@ import type { Font } from "opentype.js";
   }
 
   // Get exact bounding box of non-empty pixels
+  /** Max total pixels (width * height) before getActiveBoundsSize skips scanning */
+  const ACTIVE_BOUNDS_MAX_PIXELS = 1024 * 1024;
+
   export function getActiveBoundsSize(): {
     width: number;
     height: number;
@@ -265,6 +268,12 @@ import type { Font } from "opentype.js";
     if (!sim) return null;
     const w = sim.getWidth();
     const h = sim.getHeight();
+    if (w * h > ACTIVE_BOUNDS_MAX_PIXELS) {
+      console.warn(
+        `getActiveBoundsSize skipped: canvas ${w}x${h} exceeds ${ACTIVE_BOUNDS_MAX_PIXELS} pixel limit.`
+      );
+      return null;
+    }
     const state = sim.readStateFloat(); // RGBA, where B is index 1
 
     let minX = w,

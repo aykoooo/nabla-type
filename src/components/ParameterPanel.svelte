@@ -1,6 +1,5 @@
 <script lang="ts">
   import { store } from "$lib/store/simStore.svelte";
-  import { onMount } from "svelte";
   import { DropdownMenu } from "bits-ui";
   import PearsonMap from "./PearsonMap.svelte";
   import Select from "./ui/Select.svelte";
@@ -15,7 +14,6 @@
     findActiveIndex,
     getPresetById,
     importPresets,
-    loadPresets,
     paramsEqualRounded,
     renamePreset,
     reorderPresets,
@@ -159,11 +157,6 @@
       round4(store.params.db) !== round4(store.baselineParams.db) ||
       round4(store.params.dt) !== round4(store.baselineParams.dt),
   );
-
-  onMount(() => {
-    store.presets = loadPresets();
-    simController.applyPresetById(store.activePresetId);
-  });
 </script>
 
 <svelte:window

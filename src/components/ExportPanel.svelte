@@ -159,12 +159,13 @@
   }
 
   async function exportPNG() {
-    if (exporting) return
+    const sim = getSimulation()
+    if (exporting || !sim) return
     exporting = true
     exportStatus = 'Generating PNG…'
 
     try {
-      const canvas = document.querySelector('canvas')
+      const canvas = sim.getCanvasElement()
       if (!canvas) throw new Error('Canvas not found')
 
       const outW = Math.max(1, Math.round(pngWidth))

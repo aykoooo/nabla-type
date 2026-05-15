@@ -55,9 +55,10 @@ export class SeedGenerator {
         // Draw text in black (glyph = seeded)
         ctx.fillStyle = '#000000'
 
+        const safeText = text || 'A'
         if (font) {
             // opentype.js font path
-            const path = font.getPath(text, 0, 0, fontSize)
+            const path = font.getPath(safeText, 0, 0, fontSize)
             const bbox = path.getBoundingBox()
             const textWidth = bbox.x2 - bbox.x1
             const textHeight = bbox.y2 - bbox.y1
@@ -65,15 +66,15 @@ export class SeedGenerator {
             const y = (height - textHeight) / 2 - bbox.y1
 
             // Draw using opentype path
-            const drawPath = font.getPath(text, x, y, fontSize)
-            drawPath.draw(ctx as any) // OffscreenCanvasRenderingContext2D vs CanvasRenderingContext2D mismatch
+            const drawPath = font.getPath(safeText, x, y, fontSize)
+            drawPath.draw(ctx as unknown as CanvasRenderingContext2D)
             ctx.fill()
         } else {
             // Canvas 2D default font fallback
             ctx.font = `bold ${fontSize}px sans-serif`
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
-            ctx.fillText(text, width / 2, height / 2)
+            ctx.fillText(safeText, width / 2, height / 2)
         }
 
         return ctx.getImageData(0, 0, width, height)

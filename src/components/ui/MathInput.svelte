@@ -32,12 +32,12 @@
 
   function handleBlur(e: FocusEvent) {
     isFocused = false;
-    let parsed;
+    let parsed: number | undefined;
     try {
       const sanitized = editValue.replace(",", ".").replace(/[^0-9\.\+\-\*\/\(\) ]/g, "");
       parsed = new Function("return " + (sanitized || String(value)))();
-    } catch (err) {
-      parsed = Number(editValue.replace(",", ".").replace(/[^0-9\.\-]/g, ""));
+    } catch {
+      parsed = Number(editValue.replace(",", "."));
     }
 
     if (typeof parsed === "number" && !isNaN(parsed)) {

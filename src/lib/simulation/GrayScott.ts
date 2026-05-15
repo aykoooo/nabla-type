@@ -74,37 +74,9 @@ export class GrayScott {
         this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
         this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
 
-        // Create 1x1 param map placeholders
-        this.feedMapTex = this.regl.texture({
-            width: 1, height: 1,
-            data: new Uint8Array([128, 0, 0, 255]),
-            format: 'rgba', type: 'uint8',
-            min: 'nearest', mag: 'nearest',
-            wrap: 'clamp',
-        })
-        this.killMapTex = this.regl.texture({
-            width: 1, height: 1,
-            data: new Uint8Array([128, 0, 0, 255]),
-            format: 'rgba', type: 'uint8',
-            min: 'nearest', mag: 'nearest',
-            wrap: 'clamp',
-        })
-
-        // Create 256x1 colormap texture (placeholder, white)
-        const lutData = new Uint8Array(256 * 4)
-        for (let i = 0; i < 256; i++) {
-            lutData[i * 4 + 0] = 255
-            lutData[i * 4 + 1] = 255
-            lutData[i * 4 + 2] = 255
-            lutData[i * 4 + 3] = 255
-        }
-        this.colormapTex = this.regl.texture({
-            width: 256, height: 1,
-            data: lutData,
-            format: 'rgba', type: 'uint8',
-            min: 'linear', mag: 'linear',
-            wrap: 'clamp',
-        })
+        this.feedMapTex = this.createParamMapTexture()
+        this.killMapTex = this.createParamMapTexture()
+        this.colormapTex = this.createWhiteColormapTexture()
 
         // Initialize state to A=1, B=0 everywhere
         this.clearState()
@@ -165,6 +137,33 @@ export class GrayScott {
             type: 'float',
             min: 'nearest',
             mag: 'nearest',
+            wrap: 'clamp',
+        })
+    }
+
+    private createParamMapTexture(): ReglTexture2D {
+        return this.regl.texture({
+            width: 1, height: 1,
+            data: new Uint8Array([128, 0, 0, 255]),
+            format: 'rgba', type: 'uint8',
+            min: 'nearest', mag: 'nearest',
+            wrap: 'clamp',
+        })
+    }
+
+    private createWhiteColormapTexture(): ReglTexture2D {
+        const lutData = new Uint8Array(256 * 4)
+        for (let i = 0; i < 256; i++) {
+            lutData[i * 4 + 0] = 255
+            lutData[i * 4 + 1] = 255
+            lutData[i * 4 + 2] = 255
+            lutData[i * 4 + 3] = 255
+        }
+        return this.regl.texture({
+            width: 256, height: 1,
+            data: lutData,
+            format: 'rgba', type: 'uint8',
+            min: 'linear', mag: 'linear',
             wrap: 'clamp',
         })
     }
@@ -375,6 +374,10 @@ export class GrayScott {
         return this.height
     }
 
+    getCanvasElement(): HTMLCanvasElement {
+        return this.canvasEl
+    }
+
     private handleContextLost = (e: Event) => {
         e.preventDefault()
         this.contextLostCallback?.(e)
@@ -385,6 +388,10 @@ export class GrayScott {
         this.pongTex = this.createFloatTexture(this.width, this.height)
         this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
         this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
+
+        this.feedMapTex = this.createParamMapTexture()
+        this.killMapTex = this.createParamMapTexture()
+        this.colormapTex = this.createWhiteColormapTexture()
 
         this.clearState()
         this.simCmd = this.createSimCommand()
@@ -405,5 +412,4 @@ export class GrayScott {
         this.colormapTex.destroy()
         this.regl.destroy()
     }
-
-    }
+}
