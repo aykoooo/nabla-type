@@ -39,6 +39,26 @@
             : 0,
     );
 
+    function closestFrameIndex(iteration: number): { index: number; diff: number } {
+        const len = replay.frames.length;
+        let lo = 0, hi = len;
+        while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (replay.frames[mid].iteration < iteration) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        const idx = Math.min(lo, len - 1);
+        if (idx === 0) {
+            return { index: 0, diff: Math.abs(replay.frames[0].iteration - iteration) };
+        }
+        const diffIdx = Math.abs(replay.frames[idx].iteration - iteration);
+        const diffPrev = Math.abs(replay.frames[idx - 1].iteration - iteration);
+        return diffPrev <= diffIdx ? { index: idx - 1, diff: diffPrev } : { index: idx, diff: diffIdx };
+    }
+
     let pauseMarkers = $derived.by(() => {
         if (
             !store.pauseIterations ||
@@ -59,18 +79,9 @@
 
         for (let markerIndex = 0; markerIndex < store.pauseIterations.length; markerIndex++) {
             const iter = store.pauseIterations[markerIndex];
-            let closestIndex = -1;
-            let minDiff = Infinity;
+            const { index: closestIndex, diff } = closestFrameIndex(iter);
 
-            for (let i = 0; i < replay.frames.length; i++) {
-                const diff = Math.abs(replay.frames[i].iteration - iter);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closestIndex = i;
-                }
-            }
-
-            if (closestIndex >= 0 && minDiff < 100) {
+            if (closestIndex >= 0 && diff < 100) {
                 markers.push({
                     pct: (closestIndex / maxIndex) * 100,
                     label: markerIndex + 1,
