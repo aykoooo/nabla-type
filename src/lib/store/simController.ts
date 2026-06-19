@@ -1,4 +1,4 @@
-import { store } from "./simStore.svelte";
+import { store, popParamHistory, pushParamHistory, pushRedoParamHistory, popRedoParamHistory } from "./simStore.svelte";
 import { replay } from "./replayStore.svelte";
 import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
 import { cloneParams, findActiveIndex, getPresetById } from "./presetStore";
@@ -127,9 +127,33 @@ class SimController {
     }
 
     handleUndo() {
-        this.canvasRef?.restorePauseSnapshot();
-        replay.clear();
-        store.isRunning = false;
+        if (store.hasPauseSnapshot) {
+            this.canvasRef?.restorePauseSnapshot();
+            replay.clear();
+            store.isRunning = false;
+            return;
+        }
+        const paramSnap = popParamHistory();
+        if (paramSnap) {
+            pushRedoParamHistory({ ...store.params });
+            store.params = { ...paramSnap };
+            store.baselineParams = { ...paramSnap };
+            store.isRunning = false;
+        }
+    }
+
+    handleRedo() {
+        const redoParams = popRedoParamHistory();
+        if (redoParams) {
+            pushParamHistory({ ...store.params });
+            store.params = { ...redoParams };
+            store.baselineParams = { ...redoParams };
+            store.isRunning = false;
+        }
+    }
+
+    resetParamsToPreset() {
+        this.applyPresetById(store.activePresetId);
     }
 
     handleLoop() {
@@ -184,6 +208,7 @@ class SimController {
     applyPresetById(id: string) {
         const entry = getPresetById(store.presets, id);
         if (!entry) return;
+        const previousParams = { ...store.params };
         store.activePresetId = id;
         store.params.feed = entry.params.feed;
         store.params.kill = entry.params.kill;
@@ -192,6 +217,7 @@ class SimController {
         store.params.dt = entry.params.dt;
         store.params.stepsPerFrame = entry.params.stepsPerFrame;
         store.baselineParams = cloneParams(entry.params);
+        pushParamHistory(previousParams);
     }
 
     }
