@@ -89,6 +89,7 @@ export function prepareBinaryMask(
 
 export interface ExportMetadata {
     seed?: string
+    fontName?: string
     timestamp: string
     resolution: { width: number; height: number }
     iterations: number
@@ -102,6 +103,7 @@ export interface ExportOptions {
     svgHeight?: number
     split?: boolean
     metadata?: ExportMetadata
+    includeMetadata?: boolean
 }
 
 export async function renderSVG(
@@ -116,7 +118,8 @@ export async function renderSVG(
 
 function applyEnvelope(svgString: string, opts: ExportOptions): string {
     const pad = opts.padding ?? 16
-    const meta = buildMetadata(opts.metadata)
+    const includeMeta = opts.includeMetadata ?? true
+    const meta = includeMeta ? buildMetadata(opts.metadata) : []
 
     if (!pad && !opts.svgWidth && !opts.svgHeight) {
         return injectMetadata(svgString, meta)
@@ -152,6 +155,7 @@ function buildMetadata(m?: ExportMetadata): string[] {
     if (!m) return []
     const L: string[] = ['<!-- Generated in nabla-type -->']
     if (m.seed) L.push(`<!-- Seed: ${sanitizeXml(m.seed)} -->`)
+    if (m.fontName) L.push(`<!-- Font: ${sanitizeXml(m.fontName)} -->`)
     L.push(`<!-- Exported: ${m.timestamp} -->`)
     L.push(`<!-- Resolution: ${m.resolution.width}×${m.resolution.height} -->`)
     L.push(`<!-- Iterations: ${m.iterations} -->`)
