@@ -248,7 +248,7 @@
               }}
               placeholder="#RRGGBB"
             />
-            <span class="text-[10px] text-black/60 shrink-0">pos</span>
+            <span class="text-[10px] text-brutal-secondary shrink-0">pos</span>
             <Tooltip content="Stop position %" side="top">
               <input
                 type="number"

@@ -40,7 +40,7 @@
           <Tooltip content={`Reset ${label}`} side="top">
             <button
               type="button"
-              class="text-black/40 hover:text-black leading-none w-5 h-5 inline-flex items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30"
+              class="text-brutal-secondary hover:text-black leading-none w-5 h-5 inline-flex items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30"
               onclick={onReset}
             >
               <RotateCcw class="w-2.5 h-2.5" strokeWidth={3} />
@@ -55,7 +55,7 @@
         {max}
         {decimals}
         {suffix}
-        class="font-mono tabular-nums text-black/50 font-medium text-right bg-transparent hover:bg-black/5 focus-visible:bg-black/10 focus-visible:outline-none px-1 h-5 rounded-sm {step < 0.1 ? 'w-16' : 'w-12'}"
+        class="font-mono tabular-nums text-brutal-secondary font-medium text-right bg-transparent hover:bg-brutal-hover focus-visible:bg-brutal-hover focus-visible:outline-none px-1 h-5 rounded-sm {step < 0.1 ? 'w-16' : 'w-12'}"
       />
     </span>
   </label>

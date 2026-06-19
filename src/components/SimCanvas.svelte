@@ -408,7 +408,7 @@ import type { Font } from "opentype.js";
       <div class="border border-black bg-white p-6 max-w-md w-full shadow-[8px_8px_0px_#000]">
           <h2 class="text-lg font-bold uppercase tracking-widest mb-3 border-b border-black pb-2 text-red-600">⚠ Hardware Error</h2>
           <p class="text-sm font-mono text-black break-words mb-4">{errorMsg}</p>
-          <p class="text-xs font-mono text-black/70">
+          <p class="text-xs font-mono text-brutal-secondary">
               Simulation requires WebGL1 with OES_texture_float support.
           </p>
       </div>
