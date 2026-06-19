@@ -60,7 +60,13 @@ class KeyboardManager {
             if (matched) {
                 event.preventDefault();
                 event.stopPropagation();
-                void action.run();
+                try {
+                    Promise.resolve(action.run()).catch((error) => {
+                        console.error(`Keyboard action failed: ${action.id}`, error);
+                    });
+                } catch (error) {
+                    console.error(`Keyboard action failed: ${action.id}`, error);
+                }
                 return;
             }
         }
