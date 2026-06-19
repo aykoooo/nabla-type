@@ -118,12 +118,44 @@ export function matchesShortcut(
 
 export function isInteractiveElement(el: EventTarget | null): boolean {
     if (!(el instanceof HTMLElement)) return false;
-    const tag = el.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    if (tag === "BUTTON" || tag === "A" || tag === "DETAILS" || tag === "SUMMARY") return true;
-    const role = el.getAttribute("role");
-    if (role === "button" || role === "checkbox" || role === "radio" || role === "link" || role === "tab") return true;
-    return el.isContentEditable;
+    const node = el.closest<HTMLElement>(
+        "input, textarea, select, button, a, details, summary, [contenteditable], [role]",
+    );
+    if (!node) return false;
+
+    const role = node.getAttribute("role");
+    if (role) {
+        const interactiveRoles = new Set([
+            "button",
+            "checkbox",
+            "radio",
+            "link",
+            "tab",
+            "textbox",
+            "searchbox",
+            "combobox",
+            "spinbutton",
+            "switch",
+            "slider",
+            "option",
+            "menuitem",
+            "listbox",
+            "menu",
+        ]);
+        if (interactiveRoles.has(role)) return true;
+    }
+
+    const tag = node.tagName;
+    return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        tag === "BUTTON" ||
+        tag === "A" ||
+        tag === "DETAILS" ||
+        tag === "SUMMARY" ||
+        node.isContentEditable
+    );
 }
 
 export function groupActions(actions: Action[]): Record<ActionCategory, Action[]> {
