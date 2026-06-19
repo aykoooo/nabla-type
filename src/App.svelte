@@ -12,8 +12,10 @@ import ParameterPanel from "./components/ParameterPanel.svelte";
 import SeedPanel from "./components/SeedPanel.svelte";
   import { initStorePersistence } from "$lib/store/simStore.svelte";
   import ColormapPicker from "./components/ColormapPicker.svelte";
-  import ExportPanel from "./components/ExportPanel.svelte";
-  import AccordionPanel from "./components/ui/AccordionPanel.svelte";
+   import ExportPanel from "./components/ExportPanel.svelte";
+   import CommandPalette from "./components/CommandPalette.svelte";
+   import KeyboardHelp from "./components/KeyboardHelp.svelte";
+   import AccordionPanel from "./components/ui/AccordionPanel.svelte";
   import { GrayScott } from "$lib/simulation/GrayScott";
   import { SeedGenerator } from "$lib/seed/SeedGenerator";
   import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
@@ -22,7 +24,8 @@ import SeedPanel from "./components/SeedPanel.svelte";
   import { simController } from "$lib/store/simController";
   import { loadPresets } from "$lib/store/presetStore";
   import { onMount, onDestroy } from "svelte";
-  import { Tooltip } from "bits-ui";
+   import { Tooltip } from "bits-ui";
+   import { keyboardManager } from "$lib/keyboard/KeyboardManager";
 
   let simCanvas: SimCanvas;
   let panZoomViewport: PanZoomViewport;
@@ -83,53 +86,11 @@ import SeedPanel from "./components/SeedPanel.svelte";
     }, 0);
   }
 
-  // Keyboard shortcuts handled centrally by svelte action or component, but for now we'll route it
-  function handleKeyDown(e: KeyboardEvent) {
-    // Don't trigger when typing in inputs
-    const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-
-    if (e.code === "Space") {
-      e.preventDefault();
-      simController.handlePause();
-    } else if (e.code === "KeyR" && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      simController.handleLoop();
-    } else if (e.code === "BracketLeft") {
-      e.preventDefault();
-      simController.cyclePreset(-1);
-    } else if (e.code === "BracketRight") {
-      e.preventDefault();
-      simController.cyclePreset(1);
-    } else if ((e.ctrlKey || e.metaKey) && e.code === "KeyS") {
-      e.preventDefault();
-      simController.handleSave();
-    } else if ((e.ctrlKey || e.metaKey) && e.code === "KeyZ") {
-      e.preventDefault();
-      simController.handleUndo();
-    } else if (e.code === "Backspace" || e.code === "Delete") {
-      e.preventDefault();
-      simController.handleTrash();
-    } else if (e.code === "ArrowLeft") {
-      e.preventDefault();
-      simController.handleReplayStep(-1);
-    } else if (e.code === "ArrowRight") {
-      e.preventDefault();
-      simController.handleReplayStep(1);
-    } else if (e.code === "KeyF" && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      simController.handleMax();
-    } else if (e.code === "KeyC" && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault();
-      simController.handleCenter();
-    }
-  }
-
   let cleanupPersistence: () => void;
 
   onMount(() => {
     cleanupPersistence = initStorePersistence();
-    window.addEventListener("keydown", handleKeyDown);
+    keyboardManager.start();
     simController.setViewportRef({
       centerCanvas: () => panZoomViewport?.centerCanvas(),
       getScale: () => panZoomViewport?.getScale() ?? 1,
@@ -139,7 +100,7 @@ import SeedPanel from "./components/SeedPanel.svelte";
   });
 
   onDestroy(() => {
-    window.removeEventListener("keydown", handleKeyDown);
+    keyboardManager.stop();
     simController.setViewportRef(null);
     if (cleanupPersistence) cleanupPersistence();
   });
@@ -219,4 +180,7 @@ import SeedPanel from "./components/SeedPanel.svelte";
     </div>
   </div>
 </div>
+
+<CommandPalette />
+<KeyboardHelp />
 </Tooltip.Provider>
