@@ -58,13 +58,13 @@ export function clearPauseSnapshots() {
 // Lightweight param-only history (for map-driven changes, avoids GPU readback)
 let _paramHistory: SimParams[] = [];
 
-export function pushParamHistory(params: SimParams) {
+export function pushParamHistory(params: SimParams, clearRedo = true) {
     _paramHistory.push({ ...params });
     if (_paramHistory.length > 20) {
         _paramHistory.shift();
     }
     store.hasParamHistory = _paramHistory.length > 0;
-    clearRedoParamHistory();
+    if (clearRedo) clearRedoParamHistory();
 }
 
 export function popParamHistory(): SimParams | null {

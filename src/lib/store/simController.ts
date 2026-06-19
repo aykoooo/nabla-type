@@ -145,9 +145,10 @@ class SimController {
     handleRedo() {
         const redoParams = popRedoParamHistory();
         if (redoParams) {
-            pushParamHistory({ ...store.params });
+            const originalParams = { ...store.params };
             store.params = { ...redoParams };
             store.baselineParams = { ...redoParams };
+            pushParamHistory(originalParams, false);
             store.isRunning = false;
         }
     }
