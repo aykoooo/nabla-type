@@ -57,7 +57,8 @@
                                 <Command.GroupItems>
                                     {#each items as action (action.id)}
                                         <Command.Item
-                                            value={action.id}
+                                            value={action.label}
+                                            keywords={[action.id]}
                                             onSelect={() => onSelect(action.id)}
                                             class="group flex cursor-pointer select-none items-center justify-between px-3 py-2 text-sm outline-none hover:bg-black hover:text-white data-[selected]:bg-black data-[selected]:text-white"
                                         >
