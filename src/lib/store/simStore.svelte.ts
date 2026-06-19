@@ -55,6 +55,51 @@ export function clearPauseSnapshots() {
     store.pauseIterations = [];
 }
 
+// Lightweight param-only history (for map-driven changes, avoids GPU readback)
+let _paramHistory: SimParams[] = [];
+
+export function pushParamHistory(params: SimParams) {
+    _paramHistory.push({ ...params });
+    if (_paramHistory.length > 20) {
+        _paramHistory.shift();
+    }
+    store.hasParamHistory = _paramHistory.length > 0;
+    clearRedoParamHistory();
+}
+
+export function popParamHistory(): SimParams | null {
+    if (_paramHistory.length === 0) return null;
+    const p = _paramHistory.pop() ?? null;
+    store.hasParamHistory = _paramHistory.length > 0;
+    return p;
+}
+
+export function clearParamHistory() {
+    _paramHistory = [];
+    store.hasParamHistory = false;
+    clearRedoParamHistory();
+}
+
+// Redo buffer for parameter-only history.
+let _redoParamHistory: SimParams[] = [];
+
+export function pushRedoParamHistory(params: SimParams) {
+    _redoParamHistory.push({ ...params });
+    store.hasRedoParamHistory = _redoParamHistory.length > 0;
+}
+
+export function popRedoParamHistory(): SimParams | null {
+    if (_redoParamHistory.length === 0) return null;
+    const p = _redoParamHistory.pop() ?? null;
+    store.hasRedoParamHistory = _redoParamHistory.length > 0;
+    return p;
+}
+
+export function clearRedoParamHistory() {
+    _redoParamHistory = [];
+    store.hasRedoParamHistory = false;
+}
+
 
 interface StoredState {
     params: SimParams;
@@ -71,6 +116,8 @@ interface StoredState {
     seedText: string;
     seedFontSize: number;
     targetFps: number;
+    mapOpen: boolean;
+    advancedOpen: boolean;
 }
 
 let defaultState: StoredState | null = null;
@@ -112,6 +159,11 @@ class SimStore {
     targetFps: number = $state(defaultState?.targetFps ?? 0)
     hasPauseSnapshot: boolean = $state(false)
     pauseIterations: number[] = $state([])
+    mapOpen: boolean = $state(defaultState?.mapOpen ?? true)
+    advancedOpen: boolean = $state(defaultState?.advancedOpen ?? false)
+    colorFocused: boolean = $state(false)
+    hasParamHistory: boolean = $state(false)
+    hasRedoParamHistory: boolean = $state(false)
 }
 
 export const store = new SimStore()
@@ -134,7 +186,9 @@ export function initStorePersistence() {
                 seedText: store.seedText,
                 seedFontSize: store.seedFontSize,
                 useParamMaps: store.useParamMaps,
-                targetFps: store.targetFps
+                targetFps: store.targetFps,
+                mapOpen: store.mapOpen,
+                advancedOpen: store.advancedOpen,
             };
             try {
                 window.localStorage.setItem("nabla-type-state", JSON.stringify(state));

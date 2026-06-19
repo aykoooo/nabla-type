@@ -1,7 +1,6 @@
 <script lang="ts">
   import { store } from "$lib/store/simStore.svelte";
   import { DropdownMenu } from "bits-ui";
-  import PearsonMap from "./PearsonMap.svelte";
   import Select from "./ui/Select.svelte";
   import Tooltip from "./ui/Tooltip.svelte";
   import ParamInput from "./ui/ParamInput.svelte";
@@ -23,7 +22,6 @@
   } from "$lib/store/presetStore";
   import { simController } from "$lib/store/simController";
 
-  let pearsonOpen = $state(false);
   let savePresetName = $state("");
   let renamingId = $state<string | null>(null);
   let renameValue = $state("");
@@ -159,22 +157,6 @@
   );
 </script>
 
-<svelte:window
-  onkeydown={(e) => {
-    if (
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement ||
-      e.target instanceof HTMLSelectElement
-    )
-      return;
-
-    if (e.key === "m") {
-      e.preventDefault();
-      pearsonOpen = !pearsonOpen;
-    }
-  }}
-/>
-
 <div class="flex flex-col gap-4">
   <!-- Presets Bar -->
   <div class="flex flex-col gap-1">
@@ -199,15 +181,15 @@
           <DropdownMenu.Content class="z-50 min-w-32 bg-white border border-black shadow-md p-1 outline-none" sideOffset={4}>
             <DropdownMenu.Item class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white" onSelect={() => startRename(store.activePresetId)}>Rename</DropdownMenu.Item>
             <DropdownMenu.Item class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white" onSelect={() => handleDuplicate(store.activePresetId)}>Duplicate</DropdownMenu.Item>
-            <DropdownMenu.Separator class="h-px bg-black/10 my-1" />
+            <DropdownMenu.Separator class="h-px bg-black my-1" />
             <DropdownMenu.Item class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white" onSelect={handleImport}>Import Library</DropdownMenu.Item>
             <DropdownMenu.Item class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white" onSelect={handleExport}>Export Library</DropdownMenu.Item>
-            <DropdownMenu.Separator class="h-px bg-black/10 my-1" />
+            <DropdownMenu.Separator class="h-px bg-black my-1" />
             <DropdownMenu.Item class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white" onSelect={handleReset}>Restore Defaults</DropdownMenu.Item>
-            <DropdownMenu.Separator class="h-px bg-black/10 my-1" />
+            <DropdownMenu.Separator class="h-px bg-black my-1" />
             <DropdownMenu.Item class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white" onSelect={() => handleMoveUp(store.activePresetId)}>Move Up</DropdownMenu.Item>
             <DropdownMenu.Item class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white" onSelect={() => handleMoveDown(store.activePresetId)}>Move Down</DropdownMenu.Item>
-            <DropdownMenu.Separator class="h-px bg-black/10 my-1" />
+            <DropdownMenu.Separator class="h-px bg-black my-1" />
             <DropdownMenu.Item disabled={store.presets.length <= 1} class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs outline-none hover:bg-red-50 text-red-600 data-[highlighted]:bg-red-600 data-[highlighted]:text-white data-[disabled]:opacity-50" onSelect={() => handleDelete(store.activePresetId)}>Delete</DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
@@ -215,7 +197,7 @@
     </div>
 
         {#if renamingId}
-          <div class="p-2 border-b border-black/10 flex gap-1">
+          <div class="p-2 border-b border-black flex gap-1">
             <!-- svelte-ignore a11y_autofocus -->
             <input
               class="border border-black px-2 py-1 text-xs w-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black h-7"
@@ -235,7 +217,7 @@
         {/if}
 
         {#if showNewInput}
-          <div class="p-2 border-b border-black/10 flex gap-1">
+          <div class="p-2 border-b border-black flex gap-1">
             <!-- svelte-ignore a11y_autofocus -->
             <input
               class="border border-black px-2 py-1 text-xs w-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black h-7"
@@ -312,14 +294,4 @@
   </div>
 
   <div class="h-px bg-black opacity-10 my-1"></div>
-
-  <!-- Pick from Map -->
-  <button
-    class="border border-black bg-white text-black px-3 py-1.5 text-xs font-semibold tracking-wide hover:bg-black hover:text-white w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
-    onclick={() => (pearsonOpen = true)}
-  >
-    Pick from Parameter Map
-  </button>
-
-  <PearsonMap bind:open={pearsonOpen} />
 </div>

@@ -29,8 +29,8 @@
     // Drag Origin Coordinates
     let startMouseX = 0;
     let startMouseY = 0;
-    let startWidth = 0;
-    let startHeight = 0;
+    let startWidth = $state(0);
+    let startHeight = $state(0);
     
     // Live Preview Dimensions
     let previewWidth = $state(0);

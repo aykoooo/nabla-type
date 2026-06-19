@@ -7,7 +7,7 @@
     import RefreshCw from "lucide-svelte/icons/refresh-cw";
     import Trash2 from "lucide-svelte/icons/trash-2";
 
-    const canUndo = $derived(store.hasPauseSnapshot);
+    const canUndo = $derived(store.hasPauseSnapshot || store.hasParamHistory);
     const canMin = $derived(store.seedText.trim().length > 0);
 </script>
 

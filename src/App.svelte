@@ -9,10 +9,11 @@ import TopControlBar from "./components/TopControlBar.svelte";
 import LeftToolbar from "./components/LeftToolbar.svelte";
 import BottomTimelineBar from "./components/BottomTimelineBar.svelte";
 import ParameterPanel from "./components/ParameterPanel.svelte";
+import ParameterMap from "./components/ParameterMap.svelte";
 import SeedPanel from "./components/SeedPanel.svelte";
-  import { initStorePersistence } from "$lib/store/simStore.svelte";
-  import ColormapPicker from "./components/ColormapPicker.svelte";
-  import ExportPanel from "./components/ExportPanel.svelte";
+   import { initStorePersistence } from "$lib/store/simStore.svelte";
+   import ColormapPicker from "./components/ColormapPicker.svelte";
+   import ExportPanel from "./components/ExportPanel.svelte";
   import AccordionPanel from "./components/ui/AccordionPanel.svelte";
   import { GrayScott } from "$lib/simulation/GrayScott";
   import { SeedGenerator } from "$lib/seed/SeedGenerator";
@@ -22,7 +23,8 @@ import SeedPanel from "./components/SeedPanel.svelte";
   import { simController } from "$lib/store/simController";
   import { loadPresets } from "$lib/store/presetStore";
   import { onMount, onDestroy } from "svelte";
-  import { Tooltip } from "bits-ui";
+   import { Tooltip } from "bits-ui";
+   import { focusWithin } from "$lib/actions/focusWithin";
 
   let simCanvas: SimCanvas;
   let panZoomViewport: PanZoomViewport;
@@ -204,13 +206,19 @@ import SeedPanel from "./components/SeedPanel.svelte";
           <SeedPanel bind:this={seedPanel} onReseed={handleReseed} />
         </AccordionPanel>
 
-        <AccordionPanel title="Advanced Parameters" open>
+        <AccordionPanel title="Parameter Map" bind:open={store.mapOpen}>
+          <ParameterMap src="/parameter-map.bin" />
+        </AccordionPanel>
+
+        <AccordionPanel title="Advanced Parameters" bind:open={store.advancedOpen}>
           <ParameterPanel />
         </AccordionPanel>
 
-        <AccordionPanel title="Colors" open>
-          <ColormapPicker />
-        </AccordionPanel>
+        <div use:focusWithin={{ onFocusChange: (v) => store.colorFocused = v }}>
+          <AccordionPanel title="Colors" open>
+            <ColormapPicker />
+          </AccordionPanel>
+        </div>
 
         <AccordionPanel title="Export">
           <ExportPanel {getSimulation} />
