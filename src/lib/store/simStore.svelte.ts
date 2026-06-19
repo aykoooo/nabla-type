@@ -71,6 +71,7 @@ interface StoredState {
     seedText: string;
     seedFontSize: number;
     targetFps: number;
+    singleKeyShortcutsEnabled: boolean;
 }
 
 let defaultState: StoredState | null = null;
@@ -112,6 +113,9 @@ class SimStore {
     targetFps: number = $state(defaultState?.targetFps ?? 0)
     hasPauseSnapshot: boolean = $state(false)
     pauseIterations: number[] = $state([])
+    singleKeyShortcutsEnabled: boolean = $state(defaultState?.singleKeyShortcutsEnabled ?? true)
+    commandPaletteOpen: boolean = $state(false)
+    keyboardHelpOpen: boolean = $state(false)
 }
 
 export const store = new SimStore()
@@ -134,7 +138,8 @@ export function initStorePersistence() {
                 seedText: store.seedText,
                 seedFontSize: store.seedFontSize,
                 useParamMaps: store.useParamMaps,
-                targetFps: store.targetFps
+                targetFps: store.targetFps,
+                singleKeyShortcutsEnabled: store.singleKeyShortcutsEnabled,
             };
             try {
                 window.localStorage.setItem("nabla-type-state", JSON.stringify(state));
