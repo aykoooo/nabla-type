@@ -1,7 +1,7 @@
 import { store, popParamHistory, pushParamHistory, pushRedoParamHistory, popRedoParamHistory } from "./simStore.svelte";
 import { replay } from "./replayStore.svelte";
 import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
-import { cloneParams, findActiveIndex, getPresetById } from "./presetStore";
+import { cloneParams, findActiveIndex, getPresetById, paramsEqualRounded } from "./presetStore";
 import type { GrayScott } from "../simulation/GrayScott";
 import type { Font } from "opentype.js";
 
@@ -218,7 +218,9 @@ class SimController {
         store.params.dt = entry.params.dt;
         store.params.stepsPerFrame = entry.params.stepsPerFrame;
         store.baselineParams = cloneParams(entry.params);
-        pushParamHistory(previousParams);
+        if (!paramsEqualRounded(previousParams, entry.params)) {
+            pushParamHistory(previousParams);
+        }
     }
 
     }
