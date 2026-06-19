@@ -132,14 +132,9 @@ class SimController {
         store.isRunning = false;
     }
 
-    // Stubs: implementations land via feat/parameter-map and feat/export-overhaul
-    handleRedo() {}
-
     resetParamsToPreset() {
         this.applyPresetById(store.activePresetId);
     }
-
-    async handleSaveSvg() {}
 
     handleLoop() {
         if (store.seedFont) {
