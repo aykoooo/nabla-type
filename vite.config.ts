@@ -33,7 +33,7 @@ function potraceWorkerPlugin(): Plugin {
       })
     },
     // Build: copy workers file into output assets directory
-    writeBundle(_opts, bundle) {
+    writeBundle(_opts, _bundle) {
       const dest = path.resolve(__dirname, 'dist/assets/potrace-plus.workers.js')
       fs.mkdirSync(path.dirname(dest), { recursive: true })
       fs.copyFileSync(source, dest)
@@ -43,6 +43,9 @@ function potraceWorkerPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    chunkSizeWarningLimit: 1024,
+  },
   plugins: [
     tailwindcss(),
     svelte(),
