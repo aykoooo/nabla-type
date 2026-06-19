@@ -54,7 +54,8 @@ select option, select optgroup {
   overflow: hidden;
 }
 .brutal-slider:focus {
-  outline: none;
+  outline: 2px solid #000;
+  outline-offset: 2px;
 }
 .brutal-slider::-webkit-slider-runnable-track {
   width: 100%;
