@@ -54,6 +54,9 @@ export interface WarpedParams {
     kill: number;
 }
 
+// TODO: add round-trip invariant tests for pixelToWarpedParams and
+// warpedParamsToPixel once a test framework is introduced.
+
 /** Warp normalized pixel (u,v) to (feed, kill). */
 export function pixelToWarpedParams(u: number, v: number): WarpedParams {
     // Warp-space coordinates: x, y in [-1, 1]; y grows upward.
