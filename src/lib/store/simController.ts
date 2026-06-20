@@ -2,6 +2,9 @@ import { store } from "./simStore.svelte";
 import { replay } from "./replayStore.svelte";
 import { applyAspect, clampResolution } from "$lib/utils/resolutionUtils";
 import { cloneParams, findActiveIndex, getPresetById } from "./presetStore";
+import { exportPrefs } from "./exportPrefs.svelte";
+import { prepareBinaryMask, renderSVG } from "$lib/export/SVGExporter";
+import { buildFilename } from "$lib/export/filenameBuilder";
 import type { GrayScott } from "../simulation/GrayScott";
 import type { Font } from "opentype.js";
 
@@ -112,6 +115,78 @@ class SimController {
         a.href = url;
         a.download = `rd-frame-${Date.now()}.png`;
         a.click();
+    }
+
+    async handleSaveSvg() {
+        const sim = this.canvasRef?.getSimulation();
+        if (!sim) return;
+        const width = sim.getWidth();
+        const height = sim.getHeight();
+        const pixels = sim.readPixels();
+        const imageData = prepareBinaryMask(pixels, width, height, {
+            threshold: exportPrefs.svg.threshold,
+            yFlip: true,
+            contrastStretch: true,
+        });
+
+        const svg = await renderSVG(
+            imageData,
+            {
+                turdsize: exportPrefs.svg.turdsize,
+                alphamax: exportPrefs.svg.alphamax,
+                opttolerance: exportPrefs.svg.opttolerance,
+                optcurve: exportPrefs.svg.optcurve,
+                turnpolicy: "minority",
+            },
+            {
+                padding: exportPrefs.svg.padding,
+                svgWidth: width,
+                svgHeight: height,
+                split: exportPrefs.svg.splitPaths,
+                includeMetadata: exportPrefs.svg.includeMetadata,
+                metadata: {
+                    seed: store.seedText,
+                    fontName: exportPrefs.svg.includeFontInMetadata ? store.seedFontName || undefined : undefined,
+                    timestamp: new Date().toISOString(),
+                    resolution: { width, height },
+                    iterations: store.iterationCount,
+                    simParams: {
+                        feed: store.params.feed,
+                        kill: store.params.kill,
+                        da: store.params.da,
+                        db: store.params.db,
+                        dt: store.params.dt,
+                    },
+                    tracingParams: {
+                        turdsize: exportPrefs.svg.turdsize,
+                        alphamax: exportPrefs.svg.alphamax,
+                        opttolerance: exportPrefs.svg.opttolerance,
+                        optcurve: exportPrefs.svg.optcurve,
+                        turnpolicy: "minority",
+                    },
+                },
+            },
+        );
+
+        const blob = new Blob([svg], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = buildFilename(
+            "svg",
+            {
+                seedText: store.seedText,
+                fontName: store.seedFontName,
+                width,
+                height,
+                feed: store.params.feed,
+                kill: store.params.kill,
+                iteration: store.iterationCount,
+            },
+            exportPrefs.filename,
+        );
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     handlePause() {

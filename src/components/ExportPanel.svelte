@@ -1,10 +1,21 @@
 <script lang="ts">
   import { store } from '$lib/store/simStore.svelte'
-  import { GrayScott } from '$lib/simulation/GrayScott'
+  import {
+    exportPrefs,
+    schedulePersistExportPrefs,
+    resetExportPrefs,
+  } from '$lib/store/exportPrefs.svelte'
+  import { buildFilename, type FilenameContext } from '$lib/export/filenameBuilder'
+  import {
+    copyPngBlobToClipboard,
+    copyTextToClipboard,
+  } from '$lib/export/clipboard'
   import { prepareBinaryMask, renderSVG } from '$lib/export/SVGExporter'
+  import { GrayScott } from '$lib/simulation/GrayScott'
   import type { TracingParams } from '$lib/tracing/types'
-  import Select from './ui/Select.svelte'
-  import MathInput from './ui/MathInput.svelte'
+  import PngExportSection from './PngExportSection.svelte'
+  import SvgExportSection from './SvgExportSection.svelte'
+  import Checkbox from './ui/Checkbox.svelte'
 
   let {
     getSimulation,
@@ -12,49 +23,64 @@
     getSimulation: () => GrayScott | null
   } = $props()
 
-  // ---- state ---------------------------------------------------------------
+  let exportingFormat = $state<'png' | 'svg' | null>(null)
+  let status = $state('')
+  let copiedFormat = $state<'png' | 'svg' | null>(null)
 
-  let exporting = $state(false)
-  let exportStatus = $state('')
-  let exportPadding = $state(12)
-  let pngScale = $state(1)
-  let advancedOpen = $state(false)
+  const filenameCtx = $derived<FilenameContext>({
+    seedText: store.seedText,
+    fontName: store.seedFontName,
+    width: store.resolution.width,
+    height: store.resolution.height,
+    feed: store.params.feed,
+    kill: store.params.kill,
+    iteration: store.iterationCount,
+  })
 
-  // Potrace params (direct TracingParams fields + UI-only threshold)
-  let turdsize = $state(0)
-  let alphamax = $state(0.9)
-  let opttolerance = $state(0.18)
-  let optcurve = $state(true)
-  let threshold = $state('48')
-  let splitPaths = $state(false)
+  const pngFilename = $derived(
+    buildFilename(
+      'png',
+      {
+        ...filenameCtx,
+        width: Math.max(1, Math.round(filenameCtx.width * exportPrefs.png.scale)),
+        height: Math.max(1, Math.round(filenameCtx.height * exportPrefs.png.scale)),
+      },
+      exportPrefs.filename,
+    ),
+  )
 
-  // ---- derived -------------------------------------------------------------
+  const svgFilename = $derived(buildFilename('svg', filenameCtx, exportPrefs.filename))
 
-  const pngWidth = $derived(Math.max(1, Math.round(store.resolution.width * pngScale)))
-  const pngHeight = $derived(Math.max(1, Math.round(store.resolution.height * pngScale)))
-
-  // ---- presets -------------------------------------------------------------
-
-  type Preset = { key: string; label: string; turdsize: number; alphamax: number; opttolerance: number; threshold: string }
-
-  const presets: Preset[] = [
-    { key: 'clean',    label: 'Clean',    turdsize: 8, alphamax: 1.0,  opttolerance: 0.5,  threshold: '64' },
-    { key: 'balanced', label: 'Balanced', turdsize: 2, alphamax: 0.9,  opttolerance: 0.2,  threshold: '48' },
-    { key: 'detailed', label: 'Detailed', turdsize: 1, alphamax: 0.7,  opttolerance: 0.15, threshold: '32' },
-    { key: 'organic',  label: 'Organic',  turdsize: 0, alphamax: 0.5,  opttolerance: 0.1,  threshold: '16' },
-  ]
-
-  function applyPreset(p: Preset) {
-    turdsize = p.turdsize
-    alphamax = p.alphamax
-    opttolerance = p.opttolerance
-    threshold = p.threshold
-    // optcurve unchanged — always true for presets
+  function setFormat(format: 'png' | 'svg') {
+    exportPrefs.lastFormat = format
+    schedulePersistExportPrefs()
   }
 
-  // ---- utilities -----------------------------------------------------------
+  function tabClass(active: boolean): string {
+    const base =
+      'text-xs font-bold uppercase tracking-wider h-7 px-2 inline-flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black/30 transition-colors'
+    return active
+      ? `${base} bg-black text-white`
+      : `${base} bg-white text-black hover:bg-black hover:text-white`
+  }
 
-  function download(data: string | Blob, filename: string, mime: string) {
+  let statusTimeout: ReturnType<typeof setTimeout> | null = null
+  function setStatus(text: string, duration = 0) {
+    status = text
+    if (statusTimeout) clearTimeout(statusTimeout)
+    if (duration > 0) {
+      statusTimeout = setTimeout(() => (status = ''), duration)
+    }
+  }
+
+  let copiedTimeout: ReturnType<typeof setTimeout> | null = null
+  function flashCopied(format: 'png' | 'svg') {
+    copiedFormat = format
+    if (copiedTimeout) clearTimeout(copiedTimeout)
+    copiedTimeout = setTimeout(() => (copiedFormat = null), 1500)
+  }
+
+  function triggerDownload(data: Blob | string, filename: string, mime: string) {
     const blob = typeof data === 'string' ? new Blob([data], { type: mime }) : data
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -67,273 +93,265 @@
     URL.revokeObjectURL(url)
   }
 
-  // ---- export handlers -----------------------------------------------------
-
-  async function exportSVG() {
+  async function generatePngBlob(): Promise<Blob> {
     const sim = getSimulation()
-    if (!sim || exporting) return
+    if (!sim) throw new Error('Simulation not available')
 
-    exporting = true
-    exportStatus = 'Reading pixels…'
+    const canvas = sim.getCanvasElement()
+    if (!canvas) throw new Error('Canvas not found')
 
-    try {
-      const pixels = sim.readPixels()
-      const width = sim.getWidth()
-      const height = sim.getHeight()
+    const srcW = canvas.width
+    const srcH = canvas.height
+    const outW = Math.max(1, Math.round(srcW * exportPrefs.png.scale))
+    const outH = Math.max(1, Math.round(srcH * exportPrefs.png.scale))
 
-      exportStatus = 'Preparing mask…'
+    if (outW === srcW && outH === srcH) {
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/png'),
+      )
+      if (!blob) throw new Error('toBlob returned null')
+      return blob
+    }
 
-      // Merged single-pass: Y-flip + contrast-stretch + threshold + invert
-      const imageData = prepareBinaryMask(pixels, width, height, {
-        threshold: Number(threshold),
-        yFlip: true,
-        contrastStretch: true,
-      })
+    if (typeof OffscreenCanvas !== 'undefined') {
+      const oc = new OffscreenCanvas(outW, outH)
+      const ctx = oc.getContext('2d')
+      if (!ctx) throw new Error('Output context unavailable')
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(canvas, 0, 0, outW, outH)
+      return oc.convertToBlob({ type: 'image/png' })
+    }
 
-      exportStatus = 'Tracing with potrace…'
+    const fallback = document.createElement('canvas')
+    fallback.width = outW
+    fallback.height = outH
+    const ctx = fallback.getContext('2d')
+    if (!ctx) throw new Error('Fallback context unavailable')
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(canvas, 0, 0, outW, outH)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      fallback.toBlob(resolve, 'image/png'),
+    )
+    if (!blob) throw new Error('Fallback toBlob returned null')
+    return blob
+  }
 
-      const params: TracingParams = {
-        turdsize,
-        alphamax,
-        opttolerance,
-        optcurve,
-        turnpolicy: 'minority',
-      }
+  async function generateSvgString(): Promise<string> {
+    const sim = getSimulation()
+    if (!sim) throw new Error('Simulation not available')
 
-      console.log('[ExportPanel] Tracing:', JSON.stringify(params))
+    setStatus('Reading pixels…')
+    const pixels = sim.readPixels()
+    const width = sim.getWidth()
+    const height = sim.getHeight()
 
-      const svg = await renderSVG(imageData, params, {
-        padding: exportPadding,
-        svgWidth: width,
-        svgHeight: height,
-        split: splitPaths,
-        metadata: {
-          seed: store.seedText,
-          timestamp: new Date().toISOString(),
-          resolution: { width, height },
-          iterations: store.iterationCount,
-          simParams: {
-            feed: store.params.feed,
-            kill: store.params.kill,
-            da: store.params.da,
-            db: store.params.db,
-            dt: store.params.dt,
-          },
-          tracingParams: params,
+    setStatus('Preparing mask…')
+    const imageData = prepareBinaryMask(pixels, width, height, {
+      threshold: exportPrefs.svg.threshold,
+      yFlip: true,
+      contrastStretch: true,
+    })
+
+    setStatus('Tracing…')
+    const params: TracingParams = {
+      turdsize: exportPrefs.svg.turdsize,
+      alphamax: exportPrefs.svg.alphamax,
+      opttolerance: exportPrefs.svg.opttolerance,
+      optcurve: exportPrefs.svg.optcurve,
+      turnpolicy: 'minority',
+    }
+
+    return await renderSVG(imageData, params, {
+      padding: exportPrefs.svg.padding,
+      svgWidth: width,
+      svgHeight: height,
+      split: exportPrefs.svg.splitPaths,
+      includeMetadata: exportPrefs.svg.includeMetadata,
+      metadata: {
+        seed: store.seedText,
+        fontName: exportPrefs.svg.includeFontInMetadata
+          ? store.seedFontName || undefined
+          : undefined,
+        timestamp: new Date().toISOString(),
+        resolution: { width, height },
+        iterations: store.iterationCount,
+        simParams: {
+          feed: store.params.feed,
+          kill: store.params.kill,
+          da: store.params.da,
+          db: store.params.db,
+          dt: store.params.dt,
         },
-      })
+        tracingParams: params,
+      },
+    })
+  }
 
-      exportStatus = 'Downloading…'
-      download(svg, `nabla-type-${Date.now()}.svg`, 'image/svg+xml')
-
-      exportStatus = 'Done!'
-      setTimeout(() => (exportStatus = ''), 2000)
+  async function handlePngDownload() {
+    if (exportingFormat) return
+    exportingFormat = 'png'
+    try {
+      setStatus('Generating PNG…')
+      const blob = await generatePngBlob()
+      triggerDownload(blob, pngFilename, 'image/png')
+      setStatus('Done', 2000)
     } catch (err) {
-      console.error('SVG export failed:', err)
-      exportStatus = 'Export failed.'
-      setTimeout(() => (exportStatus = ''), 3000)
+      console.error('PNG export failed:', err)
+      setStatus('PNG export failed.', 3000)
     } finally {
-      exporting = false
+      exportingFormat = null
     }
   }
 
-  async function exportPNG() {
-    const sim = getSimulation()
-    if (exporting || !sim) return
-    exporting = true
-    exportStatus = 'Generating PNG…'
-
+  async function handlePngCopy() {
+    if (exportingFormat) return
+    exportingFormat = 'png'
     try {
-      const canvas = sim.getCanvasElement()
-      if (!canvas) throw new Error('Canvas not found')
-
-      const outW = Math.max(1, Math.round(pngWidth))
-      const outH = Math.max(1, Math.round(pngHeight))
-
-      if (outW === canvas.width && outH === canvas.height) {
-        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
-        if (!blob) throw new Error('toBlob returned null')
-        download(blob, `nabla-type-${Date.now()}.png`, 'image/png')
+      setStatus('Copying PNG…')
+      const blob = await generatePngBlob()
+      const ok = await copyPngBlobToClipboard(blob)
+      if (ok) {
+        flashCopied('png')
+        setStatus('PNG copied', 2000)
       } else {
-        const outCanvas = new OffscreenCanvas(outW, outH)
-        const outCtx = outCanvas.getContext('2d')
-        if (!outCtx) throw new Error('Output context unavailable')
-        outCtx.imageSmoothingEnabled = false
-        outCtx.drawImage(canvas, 0, 0, outW, outH)
-        const blob = await outCanvas.convertToBlob({ type: 'image/png' })
-        download(blob, `nabla-type-${Date.now()}.png`, 'image/png')
+        triggerDownload(blob, pngFilename, 'image/png')
+        setStatus('Clipboard unsupported — downloaded PNG', 3000)
       }
-
-      exportStatus = 'Done!'
-      setTimeout(() => (exportStatus = ''), 2000)
     } catch (err) {
-      console.error('PNG export failed:', err)
-      exportStatus = 'Export failed.'
-      setTimeout(() => (exportStatus = ''), 3000)
+      console.error('PNG copy failed:', err)
+      setStatus('PNG copy failed.', 3000)
     } finally {
-      exporting = false
+      exportingFormat = null
+    }
+  }
+
+  async function handleSvgDownload() {
+    if (exportingFormat) return
+    exportingFormat = 'svg'
+    try {
+      const svg = await generateSvgString()
+      triggerDownload(svg, svgFilename, 'image/svg+xml')
+      setStatus('Done', 2000)
+    } catch (err) {
+      console.error('SVG export failed:', err)
+      setStatus('SVG export failed.', 3000)
+    } finally {
+      exportingFormat = null
+    }
+  }
+
+  async function handleSvgCopy() {
+    if (exportingFormat) return
+    exportingFormat = 'svg'
+    try {
+      setStatus('Copying SVG…')
+      const svg = await generateSvgString()
+      const ok = await copyTextToClipboard(svg)
+      if (ok) {
+        flashCopied('svg')
+        setStatus('SVG copied', 2000)
+      } else {
+        triggerDownload(svg, svgFilename, 'image/svg+xml')
+        setStatus('Clipboard unsupported — downloaded SVG', 3000)
+      }
+    } catch (err) {
+      console.error('SVG copy failed:', err)
+      setStatus('SVG copy failed.', 3000)
+    } finally {
+      exportingFormat = null
     }
   }
 </script>
 
 <div class="flex flex-col gap-3">
-  <p class="text-[11px] text-black/70">
-    Output: {pngWidth} × {pngHeight}, padding {exportPadding}
-  </p>
+  <!-- Filename tokens -->
+  <div class="flex flex-col gap-2">
+    <span class="text-[11px] font-bold uppercase tracking-wider">Filename</span>
 
-  <div class="flex gap-2">
-    <button
-      class="border border-black bg-black text-white px-3 py-1.5 text-xs font-semibold tracking-wide disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
-      onclick={exportSVG}
-      disabled={exporting}
+    <div class="flex flex-wrap gap-x-3 gap-y-1.5">
+      <Checkbox bind:checked={exportPrefs.filename.includeSeed} onchange={schedulePersistExportPrefs}>
+        Seed
+      </Checkbox>
+
+      <Checkbox bind:checked={exportPrefs.filename.includeFont} onchange={schedulePersistExportPrefs}>
+        Font
+      </Checkbox>
+
+      <Checkbox bind:checked={exportPrefs.filename.includeResolution} onchange={schedulePersistExportPrefs}>
+        Resolution
+      </Checkbox>
+
+      <Checkbox bind:checked={exportPrefs.filename.includeTimestamp} onchange={schedulePersistExportPrefs}>
+        Timestamp
+      </Checkbox>
+
+      <Checkbox bind:checked={exportPrefs.filename.includeIteration} onchange={schedulePersistExportPrefs}>
+        Iteration
+      </Checkbox>
+
+      <Checkbox bind:checked={exportPrefs.filename.includeFeed} onchange={schedulePersistExportPrefs}>
+        Feed
+      </Checkbox>
+
+      <Checkbox bind:checked={exportPrefs.filename.includeKill} onchange={schedulePersistExportPrefs}>
+        Kill
+      </Checkbox>
+    </div>
+
+    <p
+      class="text-[10px] font-mono text-brutal-secondary break-all border border-black px-2 py-1.5 bg-brutal-surface"
+      aria-live="polite"
     >
-      Export SVG
+      {exportPrefs.lastFormat === 'png' ? pngFilename : svgFilename}
+    </p>
+  </div>
+
+  <!-- Format tabs -->
+  <div class="grid grid-cols-2 border border-black">
+    <button
+      type="button"
+      class={tabClass(exportPrefs.lastFormat === 'png')}
+      onclick={() => setFormat('png')}
+    >
+      Raster PNG
     </button>
     <button
-      class="border border-black bg-white text-black hover:bg-base-200 px-3 py-1.5 text-xs font-semibold tracking-wide disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
-      onclick={exportPNG}
-      disabled={exporting}
+      type="button"
+      class="{tabClass(exportPrefs.lastFormat === 'svg')} border-l border-black"
+      onclick={() => setFormat('svg')}
     >
-      Export PNG
+      Vector SVG
     </button>
   </div>
 
-  <!-- Presets -->
-  <div class="grid grid-cols-4 gap-2">
-    {#each presets as p}
-      <button
-        class="border border-black px-2 py-1.5 text-xs font-semibold bg-neutral-50 hover:bg-neutral-100"
-        onclick={() => applyPreset(p)}
-      >
-        {p.label}
-      </button>
-    {/each}
-  </div>
-
-  <!-- Threshold -->
-  <label class="flex flex-col gap-1">
-    <span>Threshold</span>
-    <Select
-      class="h-[28px] border border-black px-2 py-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 bg-white"
-      items={[
-        { value: '128', label: '128' },
-        { value: '64',  label: '64' },
-        { value: '48',  label: '48' },
-        { value: '32',  label: '32' },
-        { value: '16',  label: '16' },
-      ]}
-      value={threshold}
-      onValueChange={(v) => { if (v !== undefined) threshold = v }}
+  <!-- Format body -->
+  {#if exportPrefs.lastFormat === 'png'}
+    <PngExportSection
+      busy={exportingFormat === 'png'}
+      copied={copiedFormat === 'png'}
+      onDownload={handlePngDownload}
+      onCopy={handlePngCopy}
     />
-    <span class="text-[10px] text-black/60">Lower = more detail</span>
-  </label>
+  {:else}
+    <SvgExportSection
+      busy={exportingFormat === 'svg'}
+      copied={copiedFormat === 'svg'}
+      onDownload={handleSvgDownload}
+      onCopy={handleSvgCopy}
+    />
+  {/if}
 
-  <!-- invert hint — always on for potrace -->
-  <p class="text-[10px] text-black/50 italic">Inversion is automatic — potrace needs black-on-white.</p>
+  <!-- Status -->
+  {#if status}
+    <p class="text-xs font-mono text-brutal-secondary">{status}</p>
+  {/if}
 
-  <!-- Advanced toggle -->
+  <!-- Reset -->
   <button
     type="button"
-    class="text-left border border-black px-2 py-1.5 text-xs font-semibold bg-neutral-50 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
-    onclick={() => (advancedOpen = !advancedOpen)}
+    class="self-start text-[10px] font-semibold uppercase tracking-wide text-brutal-secondary hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30"
+    onclick={resetExportPrefs}
   >
-    Advanced {advancedOpen ? '−' : '+'}
+    Reset export options
   </button>
-
-  {#if advancedOpen}
-    <div class="grid grid-cols-2 gap-2 text-xs">
-      <!-- Padding -->
-      <label class="flex flex-col gap-1">
-        <span>Padding</span>
-        <MathInput
-          bind:value={exportPadding}
-          min={0} max={128} decimals={0}
-          class="border border-black px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 w-full"
-        />
-      </label>
-      <!-- PNG Scale -->
-      <label class="flex flex-col gap-1">
-        <span>PNG Scale</span>
-        <Select
-          class="h-[28px] border border-black px-2 py-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 bg-white"
-          items={[
-            { value: '1', label: '1x' },
-            { value: '2', label: '2x' },
-            { value: '4', label: '4x' },
-          ]}
-          value={String(pngScale)}
-          onValueChange={(v) => { pngScale = Number(v) }}
-        />
-      </label>
-      <div class="flex flex-col gap-1">
-        <span>PNG Width</span>
-        <span class="border border-black px-2 py-1.5 text-xs font-mono bg-neutral-50 w-full">{pngWidth}px</span>
-      </div>
-      <div class="flex flex-col gap-1">
-        <span>PNG Height</span>
-        <span class="border border-black px-2 py-1.5 text-xs font-mono bg-neutral-50 w-full">{pngHeight}px</span>
-      </div>
-
-      <!-- Potrace advanced params -->
-      <div class="col-span-2 mt-2 border-t border-black pt-2">
-        <span class="text-[11px] font-semibold">Potrace Parameters</span>
-      </div>
-
-      <label class="flex flex-col gap-1">
-        <span>turdsize (speckle suppression)</span>
-        <MathInput
-          bind:value={turdsize}
-          min={0} max={100} decimals={0}
-          class="border border-black px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 w-full"
-        />
-        <span class="text-[10px] text-black/60">0 = keep all holes</span>
-      </label>
-
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={optcurve}
-          onchange={(e) => optcurve = (e.target as HTMLInputElement).checked}
-          class="w-4 h-4"
-        />
-        <span class="text-[11px] font-semibold">optcurve</span>
-      </label>
-
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={splitPaths}
-          onchange={(e) => splitPaths = (e.target as HTMLInputElement).checked}
-          class="w-4 h-4"
-        />
-        <span class="text-[11px] font-semibold">Individual paths (for editing)</span>
-      </label>
-
-      <label class="flex flex-col gap-1">
-        <span>alphamax (corner threshold)</span>
-        <input
-          type="range" min="0" max="1.34" step="0.01"
-          value={alphamax}
-          oninput={(e) => alphamax = parseFloat((e.target as HTMLInputElement).value)}
-          class="w-full"
-        />
-        <span class="text-[10px] text-black/60">{alphamax.toFixed(2)} (lower = more corners)</span>
-      </label>
-
-      <label class="flex flex-col gap-1">
-        <span>opttolerance (curve tolerance)</span>
-        <input
-          type="range" min="0" max="2" step="0.05"
-          value={opttolerance}
-          oninput={(e) => opttolerance = parseFloat((e.target as HTMLInputElement).value)}
-          class="w-full"
-        />
-        <span class="text-[10px] text-black/60">{opttolerance.toFixed(2)} (lower = more detail)</span>
-      </label>
-    </div>
-  {/if}
-
-  {#if exportStatus}
-    <p class="text-xs font-mono text-black/60">{exportStatus}</p>
-  {/if}
 </div>
