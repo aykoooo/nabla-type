@@ -68,6 +68,15 @@ export const actions: Action[] = [
         },
     },
     {
+        id: "playback.redo",
+        label: "Redo",
+        category: "Playback",
+        shortcut: { code: "KeyZ", mod: true, shift: true },
+        run() {
+            simController.handleRedo();
+        },
+    },
+    {
         id: "presets.prev",
         label: "Previous preset",
         category: "Presets",
@@ -151,6 +160,15 @@ export const actions: Action[] = [
         shortcut: modShortcut("KeyS"),
         run() {
             simController.handleSave();
+        },
+    },
+    {
+        id: "export.saveSvg",
+        label: "Save SVG",
+        category: "Export",
+        shortcut: { code: "KeyS", mod: true, shift: true },
+        run() {
+            void simController.handleSaveSvg();
         },
     },
     {
