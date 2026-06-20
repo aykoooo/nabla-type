@@ -118,6 +118,7 @@ interface StoredState {
     targetFps: number;
     mapOpen: boolean;
     advancedOpen: boolean;
+    singleKeyShortcutsEnabled: boolean;
 }
 
 let defaultState: StoredState | null = null;
@@ -164,6 +165,9 @@ class SimStore {
     colorFocused: boolean = $state(false)
     hasParamHistory: boolean = $state(false)
     hasRedoParamHistory: boolean = $state(false)
+    singleKeyShortcutsEnabled: boolean = $state(defaultState?.singleKeyShortcutsEnabled ?? true)
+    commandPaletteOpen: boolean = $state(false)
+    keyboardHelpOpen: boolean = $state(false)
 }
 
 export const store = new SimStore()
@@ -189,6 +193,7 @@ export function initStorePersistence() {
                 targetFps: store.targetFps,
                 mapOpen: store.mapOpen,
                 advancedOpen: store.advancedOpen,
+                singleKeyShortcutsEnabled: store.singleKeyShortcutsEnabled,
             };
             try {
                 window.localStorage.setItem("nabla-type-state", JSON.stringify(state));
