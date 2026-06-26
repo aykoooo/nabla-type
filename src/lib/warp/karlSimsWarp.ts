@@ -33,6 +33,23 @@ export const FEED_MAX = 0.12;
 export const KILL_ABS_MIN = 0.014;
 export const KILL_ABS_MAX = 0.066;
 
+/**
+ * Peak chemical-B concentration in the Karl-Sims feed/kill window used by this
+ * app. The live-sim display shader and the parameter-map widget normalize B by
+ * this value before sampling a [0,1]-normalized colormap LUT, so the full LUT
+ * range is used instead of only the bottom ~55%.
+ *
+ * Empirical: B saturates at ~0.55 across the warped parameter space.
+ *
+ * Keep in sync with the B_MAX_KARL_SIMS #define in
+ * src/lib/simulation/shaders/display.frag.
+ */
+export const B_MAX_KARL_SIMS = 0.55;
+
+/** uint8 equivalent of B_MAX_KARL_SIMS for normalizing the parameter-map .bin
+ *  payload, which stores B as round(B * 255). 255 * 0.55 = 140.25 -> 140. */
+export const B_MAX_KARL_SIMS_UINT8 = Math.round(255 * B_MAX_KARL_SIMS);
+
 // Kill-rate endpoints at the bottom of the map (feed = FEED_MIN).
 const KILL_BOTTOM_MIN = -0.003;
 const KILL_BOTTOM_MAX = 0.0115;
