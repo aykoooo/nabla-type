@@ -230,7 +230,7 @@
                 {/if}
 
                 <div
-                    class="absolute inset-y-0 w-3 -translate-x-1/2 cursor-grab"
+                    class="absolute inset-y-0 w-3 -translate-x-1/2 {isDragging ? 'cursor-grabbing' : 'cursor-grab'}"
                     style={`left: ${marker.pct}%;`}
                     title={`Pause #${marker.label}\nIteration: ${marker.iteration}\nFrame: ${marker.frameIndex + 1}`}
                 ></div>
@@ -259,7 +259,7 @@
                 <Tooltip content="Change buffer size" side="top">
                     <DropdownMenu.Root>
                         <DropdownMenu.Trigger
-                            class="bg-transparent text-black/70 hover:text-black font-mono border-none p-0 m-0 cursor-pointer h-auto outline-none focus-visible:ring-0 underline decoration-dashed decoration-black/40 hover:decoration-black flex items-center gap-0.5"
+                            class="bg-transparent text-black/70 hover:text-black font-mono border-none p-0 m-0 cursor-pointer h-auto rounded-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-black underline decoration-dashed decoration-black/40 hover:decoration-black flex items-center gap-0.5"
                         >
                             {replay.maxFramesBack}
                             <ChevronDown class="w-3 h-3" strokeWidth={3} />

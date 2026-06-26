@@ -9,6 +9,7 @@
   let fontLoader = new FontLoader();
   let autoApplyTimer: ReturnType<typeof setTimeout> | null = null;
   let textInputEl: HTMLInputElement;
+  let initializedSeedFontSize = false;
 
   export function focusInput() {
     textInputEl?.focus();
@@ -49,6 +50,10 @@
 
   $effect(() => {
     store.seedFontSize;
+    if (!initializedSeedFontSize) {
+      initializedSeedFontSize = true;
+      return;
+    }
     autoApplyTimer = setTimeout(onReseed, 160);
     return () => clearTimeout(autoApplyTimer ?? undefined);
   });

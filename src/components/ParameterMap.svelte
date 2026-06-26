@@ -152,7 +152,10 @@
   function handlePointerEnd(e: PointerEvent) {
     if (dragging) {
       dragging = false;
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      const el = e.currentTarget as HTMLElement;
+      if (el.hasPointerCapture(e.pointerId)) {
+        el.releasePointerCapture(e.pointerId);
+      }
     }
   }
 
