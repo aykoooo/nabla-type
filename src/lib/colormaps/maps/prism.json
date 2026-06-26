@@ -1,0 +1,19 @@
+{
+  "id": "prism",
+  "label": "Prism",
+  "mode": "linear",
+  "stops": [
+    { "pos": 0.0, "color": "#000000" },
+    { "pos": 0.08, "color": "#ff00cc" },
+    { "pos": 0.17, "color": "#3333ff" },
+    { "pos": 0.25, "color": "#00ccff" },
+    { "pos": 0.33, "color": "#00ff66" },
+    { "pos": 0.42, "color": "#ccff00" },
+    { "pos": 0.50, "color": "#ff9900" },
+    { "pos": 0.58, "color": "#ff0000" },
+    { "pos": 0.67, "color": "#9900ff" },
+    { "pos": 0.75, "color": "#00ffff" },
+    { "pos": 0.83, "color": "#ffffff" },
+    { "pos": 1.0, "color": "#ff00cc" }
+  ]
+}

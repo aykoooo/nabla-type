@@ -1,0 +1,12 @@
+{
+  "id": "inkwell",
+  "label": "Inkwell",
+  "mode": "linear",
+  "gamma": 0.9,
+  "stops": [
+    { "pos": 0.0, "color": "#020617" },
+    { "pos": 0.30, "color": "#003c5c" },
+    { "pos": 0.60, "color": "#00b4d8" },
+    { "pos": 1.0, "color": "#ffffff" }
+  ]
+}

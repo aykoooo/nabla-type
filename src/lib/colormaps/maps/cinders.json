@@ -1,0 +1,13 @@
+{
+  "id": "cinders",
+  "label": "Cinders",
+  "mode": "linear",
+  "gamma": 0.95,
+  "stops": [
+    { "pos": 0.0, "color": "#0f0a0a" },
+    { "pos": 0.30, "color": "#5c0e0e" },
+    { "pos": 0.60, "color": "#ff4500" },
+    { "pos": 0.85, "color": "#ffaa55" },
+    { "pos": 1.0, "color": "#f5f0e6" }
+  ]
+}

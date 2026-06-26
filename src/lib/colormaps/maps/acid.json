@@ -1,0 +1,15 @@
+{
+  "id": "acid",
+  "label": "Acid",
+  "mode": "linear",
+  "stops": [
+    { "pos": 0.0, "color": "#2d0036" },
+    { "pos": 0.14, "color": "#ff006e" },
+    { "pos": 0.28, "color": "#ffbe0b" },
+    { "pos": 0.42, "color": "#8338ec" },
+    { "pos": 0.57, "color": "#3a86ff" },
+    { "pos": 0.71, "color": "#06ffa5" },
+    { "pos": 0.85, "color": "#ff006e" },
+    { "pos": 1.0, "color": "#ffffff" }
+  ]
+}

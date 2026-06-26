@@ -1,0 +1,12 @@
+{
+  "id": "ochre",
+  "label": "Ochre",
+  "mode": "linear",
+  "gamma": 1.1,
+  "stops": [
+    { "pos": 0.0, "color": "#1f1405" },
+    { "pos": 0.30, "color": "#6b4510" },
+    { "pos": 0.62, "color": "#d4a017" },
+    { "pos": 1.0, "color": "#fff5cc" }
+  ]
+}
