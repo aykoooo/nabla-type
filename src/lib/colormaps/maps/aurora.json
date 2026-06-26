@@ -1,0 +1,13 @@
+{
+  "id": "aurora",
+  "label": "Aurora",
+  "mode": "linear",
+  "gamma": 0.85,
+  "stops": [
+    { "pos": 0.0, "color": "#0c0318" },
+    { "pos": 0.25, "color": "#004f5f" },
+    { "pos": 0.50, "color": "#00b8a9" },
+    { "pos": 0.75, "color": "#c77dff" },
+    { "pos": 1.0, "color": "#fff8c5" }
+  ]
+}

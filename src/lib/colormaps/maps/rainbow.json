@@ -1,0 +1,14 @@
+{
+  "id": "rainbow",
+  "label": "Rainbow",
+  "mode": "linear",
+  "stops": [
+    { "pos": 0.0, "color": "#ff0000" },
+    { "pos": 0.17, "color": "#ff7f00" },
+    { "pos": 0.33, "color": "#ffff00" },
+    { "pos": 0.50, "color": "#00ff00" },
+    { "pos": 0.67, "color": "#0000ff" },
+    { "pos": 0.83, "color": "#4b0082" },
+    { "pos": 1.0, "color": "#9400d3" }
+  ]
+}

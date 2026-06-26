@@ -1,0 +1,11 @@
+{
+  "id": "tulip",
+  "label": "TULIP",
+  "mode": "linear",
+  "stops": [
+    { "pos": 0.0, "color": "#570000" },
+    { "pos": 0.07, "color": "#b950b0" },
+    { "pos": 0.48, "color": "#febef9" },
+    { "pos": 0.95, "color": "#febef5" }
+  ]
+}

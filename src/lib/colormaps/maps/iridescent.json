@@ -1,0 +1,13 @@
+{
+  "id": "iridescent",
+  "label": "Iridescent",
+  "mode": "linear",
+  "gamma": 0.85,
+  "stops": [
+    { "pos": 0.0, "color": "#05030a" },
+    { "pos": 0.22, "color": "#2d1b69" },
+    { "pos": 0.45, "color": "#00a8a8" },
+    { "pos": 0.72, "color": "#ff9f1c" },
+    { "pos": 1.0, "color": "#fff8e7" }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "blackwhite",
+  "label": "Black & White",
+  "mode": "linear",
+  "stops": [
+    { "pos": 0.16, "color": "#ffffff" },
+    { "pos": 0.32, "color": "#000000" }
+  ]
+}

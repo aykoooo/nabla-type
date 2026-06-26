@@ -1,0 +1,12 @@
+{
+  "id": "magma",
+  "label": "Magma",
+  "mode": "linear",
+  "stops": [
+    { "pos": 0.0, "color": "#120421" },
+    { "pos": 0.18, "color": "#3b0f70" },
+    { "pos": 0.40, "color": "#8c2981" },
+    { "pos": 0.65, "color": "#fb8861" },
+    { "pos": 1.0, "color": "#fcfdbf" }
+  ]
+}

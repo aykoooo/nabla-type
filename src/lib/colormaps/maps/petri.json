@@ -1,0 +1,12 @@
+{
+  "id": "petri",
+  "label": "Petri",
+  "mode": "linear",
+  "gamma": 0.9,
+  "stops": [
+    { "pos": 0.0, "color": "#03120f" },
+    { "pos": 0.30, "color": "#005f4b" },
+    { "pos": 0.60, "color": "#39ff14" },
+    { "pos": 1.0, "color": "#e6ffcc" }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "glitch",
+  "label": "Glitch",
+  "mode": "step",
+  "stops": [
+    { "pos": 0.0, "color": "#050505" },
+    { "pos": 0.20, "color": "#00e5ff" },
+    { "pos": 0.45, "color": "#ff0099" },
+    { "pos": 0.70, "color": "#ffea00" },
+    { "pos": 0.90, "color": "#ffffff" }
+  ]
+}
