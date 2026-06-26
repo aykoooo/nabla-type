@@ -2,21 +2,22 @@ import { DEFAULT_PRESETS, type PresetEntry, type SimParams } from '$lib/simulati
 import type { Font } from 'opentype.js'
 
 export type AspectMode = 'free' | '1:1' | '4:3' | '16:9' | 'custom'
+export type BoundaryMode = 'clamp' | 'repeat' | 'mirror'
 
 export interface GradientStop {
     color: string
     position: number // normalized 0..1
 }
 
-export interface PauseSnapshot {
-    state: Float32Array
-    iteration: number
+/**
+ * Fields that are shared between persisted app state and pause snapshots.
+ * Kept as a single source of truth so the two shapes do not drift.
+ */
+interface SnapshotState {
     params: SimParams
-    width: number
-    height: number
     activeColormapId: string
     customColorHex: string
-    customGradientHexes: string[]
+    customSeedSourceId: string | null
     customGradientStops: GradientStop[]
     resolution: { width: number; height: number }
     resolutionLocked: boolean
@@ -25,109 +26,167 @@ export interface PauseSnapshot {
     activePresetId: string
     seedText: string
     seedFontSize: number
-    seedFont: Font | null
-    seedFontName: string
     targetFps: number
+    targetIteration: number
+    boundaryMode: BoundaryMode
 }
 
-let _pauseSnapshots: PauseSnapshot[] = [];
+export interface PauseSnapshot extends SnapshotState {
+    state: Float32Array
+    iteration: number
+    width: number
+    height: number
+    seedFont: Font | null
+    seedFontName: string
+}
+
+interface StoredState extends SnapshotState {
+    customAspectRatio: number | null
+    mapOpen: boolean
+    advancedOpen: boolean
+    singleKeyShortcutsEnabled: boolean
+}
+
+// --- Bounded stack for pause snapshots -------------------------------------
+
+class BoundedStack<T> {
+    private items: T[] = []
+    constructor(private readonly maxSize: number) {}
+
+    push(item: T) {
+        this.items.push(item)
+        if (this.items.length > this.maxSize) this.items.shift()
+    }
+
+    pop(): T | null {
+        return this.items.pop() ?? null
+    }
+
+    clear() {
+        this.items = []
+    }
+
+    get size() {
+        return this.items.length
+    }
+
+    snapshot(): T[] {
+        return [...this.items]
+    }
+}
+
+const pauseSnapshots = new BoundedStack<PauseSnapshot>(50)
 
 export function pushPauseSnapshot(snap: PauseSnapshot) {
-    _pauseSnapshots.push(snap);
-    if (_pauseSnapshots.length > 50) {
-        _pauseSnapshots.shift();
-    }
-    store.hasPauseSnapshot = _pauseSnapshots.length > 0;
-    store.pauseIterations = _pauseSnapshots.map(s => s.iteration);
+    pauseSnapshots.push(snap)
+    store.hasPauseSnapshot = pauseSnapshots.size > 0
+    store.pauseIterations = pauseSnapshots.snapshot().map(s => s.iteration)
 }
 
 export function popPauseSnapshot(): PauseSnapshot | null {
-    if (_pauseSnapshots.length === 0) return null;
-    const snap = _pauseSnapshots.pop() ?? null;
-    store.hasPauseSnapshot = _pauseSnapshots.length > 0;
-    store.pauseIterations = _pauseSnapshots.map(s => s.iteration);
-    return snap;
+    const snap = pauseSnapshots.pop()
+    store.hasPauseSnapshot = pauseSnapshots.size > 0
+    store.pauseIterations = pauseSnapshots.snapshot().map(s => s.iteration)
+    return snap
 }
 
 export function clearPauseSnapshots() {
-    _pauseSnapshots = [];
-    store.hasPauseSnapshot = false;
-    store.pauseIterations = [];
+    pauseSnapshots.clear()
+    store.hasPauseSnapshot = false
+    store.pauseIterations = []
+}
+
+// --- Undo/redo stack for parameter-only history ----------------------------
+
+class UndoStack<T> {
+    private past: T[] = []
+    private future: T[] = []
+    constructor(private readonly maxSize: number) {}
+
+    push(item: T, clearFuture = true) {
+        this.past.push(item)
+        if (this.past.length > this.maxSize) this.past.shift()
+        if (clearFuture) this.future = []
+    }
+
+    pop(): T | null {
+        return this.past.pop() ?? null
+    }
+
+    clear() {
+        this.past = []
+        this.future = []
+    }
+
+    pushFuture(item: T) {
+        this.future.push(item)
+    }
+
+    popFuture(): T | null {
+        return this.future.pop() ?? null
+    }
+
+    clearFuture() {
+        this.future = []
+    }
+
+    get canUndo() {
+        return this.past.length > 0
+    }
+
+    get canRedo() {
+        return this.future.length > 0
+    }
 }
 
 // Lightweight param-only history (for map-driven changes, avoids GPU readback)
-let _paramHistory: SimParams[] = [];
+const paramHistory = new UndoStack<SimParams>(20)
 
 export function pushParamHistory(params: SimParams, clearRedo = true) {
-    _paramHistory.push({ ...params });
-    if (_paramHistory.length > 20) {
-        _paramHistory.shift();
-    }
-    store.hasParamHistory = _paramHistory.length > 0;
-    if (clearRedo) clearRedoParamHistory();
+    paramHistory.push({ ...params }, clearRedo)
+    store.hasParamHistory = paramHistory.canUndo
+    store.hasRedoParamHistory = paramHistory.canRedo
 }
 
 export function popParamHistory(): SimParams | null {
-    if (_paramHistory.length === 0) return null;
-    const p = _paramHistory.pop() ?? null;
-    store.hasParamHistory = _paramHistory.length > 0;
-    return p;
+    const p = paramHistory.pop()
+    store.hasParamHistory = paramHistory.canUndo
+    return p
 }
 
 export function clearParamHistory() {
-    _paramHistory = [];
-    store.hasParamHistory = false;
-    clearRedoParamHistory();
+    paramHistory.clear()
+    store.hasParamHistory = false
+    store.hasRedoParamHistory = false
 }
 
-// Redo buffer for parameter-only history.
-let _redoParamHistory: SimParams[] = [];
-
 export function pushRedoParamHistory(params: SimParams) {
-    _redoParamHistory.push({ ...params });
-    store.hasRedoParamHistory = _redoParamHistory.length > 0;
+    paramHistory.pushFuture({ ...params })
+    store.hasRedoParamHistory = paramHistory.canRedo
 }
 
 export function popRedoParamHistory(): SimParams | null {
-    if (_redoParamHistory.length === 0) return null;
-    const p = _redoParamHistory.pop() ?? null;
-    store.hasRedoParamHistory = _redoParamHistory.length > 0;
-    return p;
+    const p = paramHistory.popFuture()
+    store.hasRedoParamHistory = paramHistory.canRedo
+    return p
 }
 
 export function clearRedoParamHistory() {
-    _redoParamHistory = [];
-    store.hasRedoParamHistory = false;
+    paramHistory.clearFuture()
+    store.hasRedoParamHistory = false
 }
 
+// --- LocalStorage loading --------------------------------------------------
 
-interface StoredState {
-    params: SimParams;
-    activeColormapId: string;
-    customColorHex: string;
-    customGradientHexes: string[];
-    customGradientStops: GradientStop[];
-    resolution: { width: number; height: number };
-    resolutionLocked: boolean;
-    aspectMode: AspectMode;
-    customAspectRatio: number | null;
-    useParamMaps: boolean;
-    activePresetId: string;
-    seedText: string;
-    seedFontSize: number;
-    targetFps: number;
-    mapOpen: boolean;
-    advancedOpen: boolean;
-    singleKeyShortcutsEnabled: boolean;
-}
-
-let defaultState: StoredState | null = null;
+let defaultState: StoredState | null = null
 if (typeof window !== "undefined") {
     try {
-        const saved = window.localStorage.getItem("nabla-type-state");
-        if (saved) defaultState = JSON.parse(saved);
+        const saved = window.localStorage.getItem("nabla-type-state")
+        if (saved) defaultState = JSON.parse(saved)
     } catch(e) { console.warn('Failed to load saved state from localStorage:', e) }
 }
+
+// --- Global reactive store -------------------------------------------------
 
 // Use an object wrapper so all state is mutable from outside the module
 class SimStore {
@@ -135,7 +194,7 @@ class SimStore {
     baselineParams: SimParams = $state({ ...(defaultState?.params ?? DEFAULT_PRESETS[0].params) })
     activeColormapId: string = $state(defaultState?.activeColormapId ?? 'blackwhite')
     customColorHex: string = $state(defaultState?.customColorHex ?? '#000000')
-    customGradientHexes: string[] = $state(defaultState?.customGradientHexes ?? ['#000000', '#ff4d00', '#ffd400', '#ffffff'])
+    customSeedSourceId: string | null = $state(defaultState?.customSeedSourceId ?? null)
     customGradientStops: GradientStop[] = $state(defaultState?.customGradientStops ?? [
         { color: '#000000', position: 0.0 },
         { color: '#ff4d00', position: 0.35 },
@@ -150,7 +209,7 @@ class SimStore {
     activePresetId: string = $state(defaultState?.activePresetId ?? DEFAULT_PRESETS[0].id)
     presets: PresetEntry[] = $state([])
     isRunning: boolean = $state(true)
-    seedText: string = $state(defaultState?.seedText ?? 'A')
+    seedText: string = $state(defaultState?.seedText ?? 'e')
     seedFontSize: number = $state(defaultState?.seedFontSize ?? 200)
     // Keep as plain field (non-$state) to avoid proxying third-party class instances.
     seedFont: Font | null = null
@@ -158,11 +217,14 @@ class SimStore {
     iterationCount: number = $state(0)
     fps: number = $state(0)
     targetFps: number = $state(defaultState?.targetFps ?? 0)
+    targetIteration: number = $state(defaultState?.targetIteration ?? 0)
+    boundaryMode: BoundaryMode = $state(defaultState?.boundaryMode ?? 'repeat')
+    /** Live preview resolution during canvas resize drag; null when not dragging. */
+    resizingResolution: { width: number; height: number } | null = $state(null)
     hasPauseSnapshot: boolean = $state(false)
     pauseIterations: number[] = $state([])
     mapOpen: boolean = $state(defaultState?.mapOpen ?? true)
     advancedOpen: boolean = $state(defaultState?.advancedOpen ?? false)
-    colorFocused: boolean = $state(false)
     hasParamHistory: boolean = $state(false)
     hasRedoParamHistory: boolean = $state(false)
     singleKeyShortcutsEnabled: boolean = $state(defaultState?.singleKeyShortcutsEnabled ?? true)
@@ -172,15 +234,17 @@ class SimStore {
 
 export const store = new SimStore()
 
+// --- Persistence -----------------------------------------------------------
+
 export function initStorePersistence() {
     if (typeof window === "undefined") return () => {};
     const cleanup = $effect.root(() => {
         $effect(() => {
-            const state = {
+            const state: StoredState = {
                 params: store.params,
                 activeColormapId: store.activeColormapId,
                 customColorHex: store.customColorHex,
-                customGradientHexes: store.customGradientHexes,
+                customSeedSourceId: store.customSeedSourceId,
                 customGradientStops: store.customGradientStops,
                 resolution: store.resolution,
                 resolutionLocked: store.resolutionLocked,
@@ -191,6 +255,8 @@ export function initStorePersistence() {
                 seedFontSize: store.seedFontSize,
                 useParamMaps: store.useParamMaps,
                 targetFps: store.targetFps,
+                targetIteration: store.targetIteration,
+                boundaryMode: store.boundaryMode,
                 mapOpen: store.mapOpen,
                 advancedOpen: store.advancedOpen,
                 singleKeyShortcutsEnabled: store.singleKeyShortcutsEnabled,

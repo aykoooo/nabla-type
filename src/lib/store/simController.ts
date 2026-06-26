@@ -44,26 +44,49 @@ class SimController {
         this.viewportRef?.centerCanvas();
     }
 
+    /** Apply the current aspect lock/ratio and clamp to the allowed resolution range. */
+    private resolveSize(
+        w: number,
+        h: number,
+        basis: "width" | "height" | "max" = "max",
+    ) {
+        const adjusted = applyAspect(
+            w,
+            h,
+            store.aspectMode,
+            store.resolutionLocked,
+            basis,
+            store.customAspectRatio,
+        );
+        return clampResolution(adjusted.width, adjusted.height);
+    }
+
     handleCanvasResize(w: number, h: number) {
-        const adjusted = applyAspect(w, h, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
-        const clamped = clampResolution(adjusted.width, adjusted.height);
-        this.canvasRef?.resizeSimulation(clamped.width, clamped.height);
-        store.resolution.width = clamped.width;
-        store.resolution.height = clamped.height;
+        const { width, height } = this.resolveSize(w, h);
+        this.canvasRef?.resizeSimulation(width, height);
+        store.resolution.width = width;
+        store.resolution.height = height;
         this.viewportRef?.centerCanvas();
     }
 
-    handleManualResolution(w: number, h: number, basis: "width" | "height" | "max" = "max") {
-        const adjusted = applyAspect(w, h, store.aspectMode, store.resolutionLocked, basis, store.customAspectRatio);
-        this.handleCanvasResize(adjusted.width, adjusted.height);
+    handleManualResolution(
+        w: number,
+        h: number,
+        basis: "width" | "height" | "max" = "max",
+    ) {
+        const { width, height } = this.resolveSize(w, h, basis);
+        this.handleCanvasResize(width, height);
     }
 
     handleAspectMode(mode: AspectMode) {
         store.aspectMode = mode;
         store.resolutionLocked = mode !== "free";
         if (mode === "free") store.customAspectRatio = null;
-        const current = applyAspect(store.resolution.width, store.resolution.height, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
-        this.handleCanvasResize(current.width, current.height);
+        const { width, height } = this.resolveSize(
+            store.resolution.width,
+            store.resolution.height,
+        );
+        this.handleCanvasResize(width, height);
     }
 
     handleLockCurrentRatio() {
@@ -87,27 +110,44 @@ class SimController {
         store.targetFps = Math.max(0, Math.min(240, Math.round(value)));
     }
 
+    handleTargetIteration(value: number) {
+        store.targetIteration = Math.max(0, Math.round(value));
+    }
+
+    handleTargetReached() {
+        if (!store.isRunning) return;
+        this.canvasRef?.capturePauseSnapshot();
+        if (!replay.isAtLatest()) {
+            replay.truncate(replay.cursor);
+        }
+        store.isRunning = false;
+    }
+
     handleMin() {
         const activeSize = this.canvasRef?.getActiveBoundsSize();
-        if (activeSize) {
-            const adjusted = applyAspect(activeSize.width, activeSize.height, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
-            const clamped = clampResolution(adjusted.width, adjusted.height);
-            this.handleCanvasResize(clamped.width, clamped.height);
-        }
+        if (!activeSize) return;
+        const { width, height } = this.resolveSize(
+            activeSize.width,
+            activeSize.height,
+        );
+        this.handleCanvasResize(width, height);
     }
 
     handleMax() {
         const scale = Math.max(0.01, this.viewportRef?.getScale?.() ?? 1);
-        const viewportW = Math.min(8192, Math.floor((window.innerWidth * 0.65) / scale));
-        const viewportH = Math.min(8192, Math.floor((window.innerHeight * 0.72) / scale));
-        const adjusted = applyAspect(viewportW, viewportH, store.aspectMode, store.resolutionLocked, "max", store.customAspectRatio);
-        const clamped = clampResolution(adjusted.width, adjusted.height);
-        this.handleCanvasResize(clamped.width, clamped.height);
+        const viewportW = Math.min(
+            8192,
+            Math.floor((window.innerWidth * 0.65) / scale),
+        );
+        const viewportH = Math.min(
+            8192,
+            Math.floor((window.innerHeight * 0.72) / scale),
+        );
+        const { width, height } = this.resolveSize(viewportW, viewportH);
+        this.handleCanvasResize(width, height);
     }
 
     handleSave() {
-        const sim = this.canvasRef?.getSimulation();
-        if (!sim) return;
         const canvas = this.canvasRef?.getCanvasElement();
         if (!canvas) return;
         const url = canvas.toDataURL("image/png");
@@ -129,42 +169,42 @@ class SimController {
             contrastStretch: true,
         });
 
+        const tracingParams = {
+            turdsize: exportPrefs.svg.turdsize,
+            alphamax: exportPrefs.svg.alphamax,
+            opttolerance: exportPrefs.svg.opttolerance,
+            optcurve: exportPrefs.svg.optcurve,
+            turnpolicy: "minority" as const,
+        };
+
+        const metadata = {
+            seed: store.seedText,
+            fontName: exportPrefs.svg.includeFontInMetadata
+                ? store.seedFontName || undefined
+                : undefined,
+            timestamp: new Date().toISOString(),
+            resolution: { width, height },
+            iterations: store.iterationCount,
+            simParams: {
+                feed: store.params.feed,
+                kill: store.params.kill,
+                da: store.params.da,
+                db: store.params.db,
+                dt: store.params.dt,
+            },
+            tracingParams,
+        };
+
         const svg = await renderSVG(
             imageData,
-            {
-                turdsize: exportPrefs.svg.turdsize,
-                alphamax: exportPrefs.svg.alphamax,
-                opttolerance: exportPrefs.svg.opttolerance,
-                optcurve: exportPrefs.svg.optcurve,
-                turnpolicy: "minority",
-            },
+            tracingParams,
             {
                 padding: exportPrefs.svg.padding,
                 svgWidth: width,
                 svgHeight: height,
                 split: exportPrefs.svg.splitPaths,
                 includeMetadata: exportPrefs.svg.includeMetadata,
-                metadata: {
-                    seed: store.seedText,
-                    fontName: exportPrefs.svg.includeFontInMetadata ? store.seedFontName || undefined : undefined,
-                    timestamp: new Date().toISOString(),
-                    resolution: { width, height },
-                    iterations: store.iterationCount,
-                    simParams: {
-                        feed: store.params.feed,
-                        kill: store.params.kill,
-                        da: store.params.da,
-                        db: store.params.db,
-                        dt: store.params.dt,
-                    },
-                    tracingParams: {
-                        turdsize: exportPrefs.svg.turdsize,
-                        alphamax: exportPrefs.svg.alphamax,
-                        opttolerance: exportPrefs.svg.opttolerance,
-                        optcurve: exportPrefs.svg.optcurve,
-                        turnpolicy: "minority",
-                    },
-                },
+                metadata,
             },
         );
 
@@ -190,9 +230,9 @@ class SimController {
     }
 
     handlePause() {
-        if (store.isRunning) {
-            // Do nothing extra when pausing
-        } else {
+        if (!store.isRunning) {
+            // Snapshot is captured when *leaving* the paused state, preserving
+            // the existing asymmetric pause/unpause behavior.
             this.canvasRef?.capturePauseSnapshot();
             if (!replay.isAtLatest()) {
                 replay.truncate(replay.cursor);
@@ -297,7 +337,6 @@ class SimController {
             pushParamHistory(previousParams);
         }
     }
-
-    }
+}
 
 export const simController = new SimController();
