@@ -55,8 +55,14 @@
     if (sourceId === "custom") return;
     try {
       const spec = ColormapRegistry.get(sourceId);
-      const next = spec.stops
-        .slice(0, 8)
+      const all = spec.stops;
+      const picked =
+        all.length <= 8
+          ? all
+          : Array.from({ length: 8 }, (_, i) =>
+              all[Math.round((i / 7) * (all.length - 1))],
+            );
+      const next = picked
         .map((s) => ({
           color: s.color,
           position: Math.max(0, Math.min(1, s.pos)),
@@ -196,8 +202,17 @@
     }
   });
 
+  function seedSourceLabelFor(id: string | null | undefined): string {
+    const sourceId = id && id !== "custom" ? id : "blackwhite";
+    try {
+      return ColormapRegistry.get(sourceId).label;
+    } catch {
+      return ColormapRegistry.get("blackwhite").label;
+    }
+  }
+
   const seedSourceLabel = $derived(
-    ColormapRegistry.get(store.customSeedSourceId ?? "blackwhite").label,
+    seedSourceLabelFor(store.customSeedSourceId),
   );
 </script>
 
@@ -222,9 +237,6 @@
               ? 'bg-black text-white'
               : 'bg-white text-black hover:bg-neutral-100/50'}"
             aria-pressed={store.activeColormapId === "custom"}
-            onkeydown={(e) => {
-              if (e.key === " ") e.preventDefault();
-            }}
           >
             <span class="text-[10px] font-bold uppercase tracking-wider"
               >Custom</span
@@ -253,9 +265,6 @@
               onclick={(e) => {
                 seedFromSource();
                 (e.currentTarget as HTMLButtonElement).blur();
-              }}
-              onkeydown={(e) => {
-                if (e.key === " ") e.preventDefault();
               }}
             >
               Seed from {seedSourceLabel}
@@ -341,18 +350,22 @@
                       step="1"
                       value={Math.round(item.stop.position * 100)}
                       class="w-11 shrink-0 border border-black px-1 py-1 text-center text-[11px]"
-                      onblur={(e) =>
-                        applyStopPosition(
-                          item.index,
-                          Number((e.target as HTMLInputElement).value) / 100,
-                        )}
+                      onblur={(e) => {
+                        const value = Number(
+                          (e.target as HTMLInputElement).value,
+                        );
+                        if (Number.isFinite(value)) {
+                          applyStopPosition(item.index, value / 100);
+                        }
+                      }}
                       onkeydown={(e) => {
                         if (e.key === "Enter") {
-                          applyStopPosition(
-                            item.index,
-                            Number((e.target as HTMLInputElement).value) /
-                              100,
+                          const value = Number(
+                            (e.target as HTMLInputElement).value,
                           );
+                          if (Number.isFinite(value)) {
+                            applyStopPosition(item.index, value / 100);
+                          }
                         }
                       }}
                     />

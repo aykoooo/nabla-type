@@ -20,7 +20,7 @@ class ColormapRegistryImpl {
       if (isColormapSpec(data)) {
         this.maps.set(data.id, data);
       } else {
-        console.warn(`Invalid colormap spec in ${path}`);
+        throw new Error(`Invalid colormap spec in ${path}`);
       }
     }
   }

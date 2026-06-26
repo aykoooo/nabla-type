@@ -31,7 +31,12 @@ export function isColormapSpec(v: unknown): v is ColormapSpec {
     if (!s || typeof s !== "object") return false;
     const stop = s as Record<string, unknown>;
     if (typeof stop.pos !== "number" || Number.isNaN(stop.pos)) return false;
-    if (typeof stop.color !== "string") return false;
+    if (
+      typeof stop.color !== "string" ||
+      !/^#[0-9a-fA-F]{6}$/.test(stop.color)
+    ) {
+      return false;
+    }
   }
 
   if (o.gamma !== undefined && (typeof o.gamma !== "number" || o.gamma <= 0))
