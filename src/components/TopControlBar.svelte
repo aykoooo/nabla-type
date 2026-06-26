@@ -14,62 +14,71 @@
         { value: "16:9", label: "16:9" },
     ];
 
-    let widthInput = $state(512);
-    let heightInput = $state(512);
+    let widthInput = $state(store.resolution.width);
+    let heightInput = $state(store.resolution.height);
 
     $effect(() => {
-        widthInput = store.resolution.width;
-        heightInput = store.resolution.height;
+        const live = store.resizingResolution ?? store.resolution;
+        widthInput = live.width;
+        heightInput = live.height;
     });
 
-    function applyWidth() {
+    function applyResolution(basis: "width" | "height") {
         simController.handleManualResolution(
             Number(widthInput),
             Number(heightInput),
-            "width",
+            basis,
         );
     }
 
-    function applyHeight() {
-        simController.handleManualResolution(
-            Number(widthInput),
-            Number(heightInput),
-            "height",
-        );
-    }
-
-    let targetFpsInput = $state(store.targetFps);
+    let targetIterationInput = $state(store.targetIteration);
 
     $effect(() => {
-        targetFpsInput = store.targetFps;
+        targetIterationInput = store.targetIteration;
     });
 
-    function applyTargetFps() {
-        simController.handleTargetFps(targetFpsInput);
+    function applyTargetIteration() {
+        simController.handleTargetIteration(targetIterationInput);
     }
+
+    const boxClass =
+        "h-7 border border-black bg-white px-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black";
+    const labelClass =
+        "text-[10px] font-bold uppercase tracking-wider text-black/60 select-none";
+
+    const lockLabel = $derived(
+        store.resolutionLocked ? "Unlock aspect ratio" : "Lock current aspect ratio",
+    );
+    const lockButtonClass = $derived(
+        store.resolutionLocked
+            ? "bg-black text-white"
+            : "bg-white text-black hover:bg-black hover:text-white",
+    );
 </script>
 
 <div
-    class="flex items-center gap-2 px-3 py-1.5 bg-white w-full overflow-x-auto shrink-0"
+    class="flex items-center gap-4 px-3 py-1.5 bg-white w-full overflow-x-auto shrink-0"
 >
-    <div class="flex items-center gap-1">
-        <span class="text-[11px] font-bold uppercase mr-1">Res</span>
-        <Tooltip content="Width (W)">
+    <!-- Resolution -->
+    <div class="flex items-center gap-1.5">
+        <span class={labelClass}>Res</span>
+        <Tooltip content="Width (W)" side="bottom">
             <div class="relative">
                 <MathInput
-                    class="w-16 border border-black px-1 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black pr-4"
+                    class="{boxClass} w-16 pr-5"
                     bind:value={widthInput}
                     min={32}
                     max={8192}
                     decimals={0}
-                    onblur={applyWidth}
+                    onblur={() => applyResolution("width")}
                 />
                 <span
-                    class="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-black/30 font-mono pointer-events-none"
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-black/30 font-mono pointer-events-none"
                     >W</span
                 >
             </div>
         </Tooltip>
+
         <Tooltip
             content={store.resolutionLocked
                 ? "Locked — click to unlock"
@@ -78,16 +87,13 @@
         >
             <button
                 type="button"
-                class="w-6 h-6 flex items-center justify-center shrink-0 {store.resolutionLocked
-                    ? 'text-black'
-                    : 'text-black/30 hover:text-black'}"
+                class="h-7 w-7 flex items-center justify-center border border-black shrink-0 transition-colors {lockButtonClass}"
                 onclick={() =>
                     store.resolutionLocked
                         ? simController.handleAspectMode("free")
                         : simController.handleLockCurrentRatio()}
-                aria-label={store.resolutionLocked
-                    ? "Unlock aspect ratio"
-                    : "Lock current aspect ratio"}
+                aria-label={lockLabel}
+                aria-pressed={store.resolutionLocked}
             >
                 {#if store.resolutionLocked}
                     <Lock class="w-3 h-3" strokeWidth={2.5} />
@@ -96,34 +102,37 @@
                 {/if}
             </button>
         </Tooltip>
-        <Tooltip content="Height (H)">
+
+        <Tooltip content="Height (H)" side="bottom">
             <div class="relative">
                 <MathInput
-                    class="w-16 border border-black px-1 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black pr-4"
+                    class="{boxClass} w-16 pr-5"
                     bind:value={heightInput}
                     min={32}
                     max={8192}
                     decimals={0}
-                    onblur={applyHeight}
+                    onblur={() => applyResolution("height")}
                 />
                 <span
-                    class="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-black/30 font-mono pointer-events-none"
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-black/30 font-mono pointer-events-none"
                     >H</span
                 >
             </div>
         </Tooltip>
     </div>
 
-    <div class="w-px h-4 bg-black/20 mx-1"></div>
+    <div class="w-px h-7 bg-black/20 self-center"></div>
 
-    <div class="flex items-center gap-1">
-        <span class="text-[11px] font-bold uppercase mr-1">Aspect</span>
+    <!-- Aspect -->
+    <div class="flex items-center gap-1.5">
+        <span class={labelClass}>Ratio</span>
         <Tooltip content="Aspect ratio preset" side="bottom">
-            <div class="w-16">
+            <div class="w-20">
                 <Select
-                    class="h-6 text-[11px] px-1 py-0 bg-white"
+                    class={boxClass}
                     items={aspectItems}
                     value={store.aspectMode}
+                    matchTriggerWidth
                     onValueChange={(v) =>
                         simController.handleAspectMode(v as AspectMode)}
                 />
@@ -131,19 +140,26 @@
         </Tooltip>
     </div>
 
-    <div class="w-px h-4 bg-black/20 mx-1"></div>
+    <div class="w-px h-7 bg-black/20 self-center"></div>
 
-    <div class="flex items-center gap-1">
-        <span class="text-[11px] font-bold uppercase mr-1">FPS</span>
-        <Tooltip content="Target FPS (0 = unlimited)">
-            <MathInput
-                class="w-14 border border-black px-1 py-0.5 text-[11px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black"
-                bind:value={targetFpsInput}
-                min={0}
-                max={240}
-                decimals={0}
-                onblur={applyTargetFps}
-            />
+    <!-- Target iteration -->
+    <div class="flex items-center gap-1.5">
+        <span class={labelClass}>Stop</span>
+        <Tooltip content="Pause automatically at this iteration (0 = unlimited)" side="bottom">
+            <div class="relative">
+                <MathInput
+                    class="{boxClass} w-20 pr-6"
+                    bind:value={targetIterationInput}
+                    min={0}
+                    max={999999}
+                    decimals={0}
+                    onblur={applyTargetIteration}
+                />
+                <span
+                    class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-black/30 font-mono pointer-events-none"
+                    >IT</span
+                >
+            </div>
         </Tooltip>
     </div>
 </div>

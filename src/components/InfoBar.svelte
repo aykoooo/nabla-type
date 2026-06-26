@@ -10,7 +10,7 @@
     <span class="text-black/50">Fps:</span>
     <span class="font-mono text-black w-10 text-right">{store.fps}</span>
     <span class="text-black/50">Target:</span>
-    <span class="font-mono text-black w-10 text-right"
-        >{store.targetFps === 0 ? "∞" : store.targetFps}</span
+    <span class="font-mono text-black w-14 text-right"
+        >{store.targetIteration === 0 ? "∞" : store.targetIteration}</span
     >
 </div>

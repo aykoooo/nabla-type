@@ -35,8 +35,8 @@ State is packed into RGBA float texture channels:
   - B, A channels = reserved (param maps may use these later)
 
 Seed mapping (from Canvas 2D pixel mask):
-  - Black pixel (glyph area)  → A=0.50, B=0.25
-  - White pixel (background)  → A=1.00, B=0.00
+- Black pixel (glyph area)  → A=0.50, B=1.00
+- White pixel (background)  → A=1.00, B=0.00
 
 ### 4. Colormap System (LUT-Based)
 Colormaps are 256×1 RGBA textures uploaded to GPU once.
