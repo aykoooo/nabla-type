@@ -1,5 +1,10 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import { Toolbar } from "bits-ui";
+    import Tooltip from "./ui/Tooltip.svelte";
+    import ZoomIn from "lucide-svelte/icons/zoom-in";
+    import ZoomOut from "lucide-svelte/icons/zoom-out";
+    import Crosshair from "lucide-svelte/icons/crosshair";
 
     let {
         children,
@@ -12,7 +17,6 @@
     } = $props();
 
     let containerEl: HTMLDivElement;
-    let contentEl: HTMLDivElement;
 
     let scale = $state(1);
     let translateX = $state(0);
@@ -26,59 +30,49 @@
     const MIN_SCALE = 0.1;
     const MAX_SCALE = 5.0;
 
+    const cursor = $derived(
+        isDragging ? "grabbing" : isSpaceDown ? "grab" : "default",
+    );
+
     function handleWheel(e: WheelEvent) {
         e.preventDefault();
 
         if (e.ctrlKey || e.metaKey) {
-            // Zooming
             const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
-            const newScale = Math.min(
-                Math.max(MIN_SCALE, scale * zoomDelta),
-                MAX_SCALE,
-            );
+            const newScale = clampScale(scale * zoomDelta);
 
-            // Zoom relative to mouse pointer position
             if (containerEl) {
                 const rect = containerEl.getBoundingClientRect();
-
-                // Get pointer position relative to viewport center
                 const mouseCenterX = e.clientX - rect.left - rect.width / 2;
                 const mouseCenterY = e.clientY - rect.top - rect.height / 2;
 
-                // Position of pointer in content's unscaled coordinate space
                 const pointX = (mouseCenterX - translateX) / scale;
                 const pointY = (mouseCenterY - translateY) / scale;
 
-                // Adjust translations to keep that point under the pointer
                 translateX = mouseCenterX - pointX * newScale;
                 translateY = mouseCenterY - pointY * newScale;
             }
 
             scale = newScale;
         } else {
-            // Panning
             translateX -= e.deltaX;
             translateY -= e.deltaY;
         }
     }
 
     function handlePointerDown(e: PointerEvent) {
-        // Start panning on middle mouse (button 1) or space + left click
-        if (e.button === 1 || (e.button === 0 && isSpaceDown)) {
-            e.preventDefault();
-            isDragging = true;
-            startPanX = e.clientX - translateX;
-            startPanY = e.clientY - translateY;
-            // Capture pointer so dragging outside the div still works
-            containerEl?.setPointerCapture(e.pointerId);
-        } else if (e.button === 0 && e.target === containerEl) {
-            // Also allow panning by dragging the empty space (the container itself)
-            e.preventDefault();
-            isDragging = true;
-            startPanX = e.clientX - translateX;
-            startPanY = e.clientY - translateY;
-            containerEl?.setPointerCapture(e.pointerId);
-        }
+        const canPan =
+            e.button === 1 ||
+            (e.button === 0 && isSpaceDown) ||
+            (e.button === 0 && e.target === containerEl);
+
+        if (!canPan) return;
+
+        e.preventDefault();
+        isDragging = true;
+        startPanX = e.clientX - translateX;
+        startPanY = e.clientY - translateY;
+        containerEl?.setPointerCapture(e.pointerId);
     }
 
     function handlePointerMove(e: PointerEvent) {
@@ -94,14 +88,12 @@
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-        // Only trigger if we aren't typing in an input
         const tag = (e.target as HTMLElement)?.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
         if (e.code === "Space") {
             isSpaceDown = true;
             if (e.target === containerEl) {
-                // Prevent spacebar scrolling
                 e.preventDefault();
             }
         }
@@ -130,22 +122,17 @@
         }
     }
 
+    function clampScale(value: number): number {
+        return Math.min(Math.max(MIN_SCALE, value), MAX_SCALE);
+    }
+
     function zoomCenter(factor: number) {
-        if (!containerEl) return;
-        const newScale = Math.min(
-            Math.max(MIN_SCALE, scale * factor),
-            MAX_SCALE,
-        );
+        const newScale = clampScale(scale * factor);
+        const pointX = -translateX / scale;
+        const pointY = -translateY / scale;
 
-        // Zoom relative to viewport center.
-        // In our coordinate system, translateX/Y are offsets from center,
-        // so viewport center is at (0, 0) in the offset space.
-        const pointX = (0 - translateX) / scale;
-        const pointY = (0 - translateY) / scale;
-
-        translateX = 0 - pointX * newScale;
-        translateY = 0 - pointY * newScale;
-
+        translateX = -pointX * newScale;
+        translateY = -pointY * newScale;
         scale = newScale;
     }
 
@@ -165,27 +152,25 @@
     }
 </script>
 
-<svelte:window on:keydown={handleKeyDown} on:keyup={handleKeyUp} />
+<svelte:window onkeydown={handleKeyDown} onkeyup={handleKeyUp} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     bind:this={containerEl}
     class="w-full h-full relative overflow-hidden bg-neutral-100 touch-none select-none"
-    style="cursor: {isSpaceDown ? 'grab' : isDragging ? 'grabbing' : 'default'};"
+    style="cursor: {cursor};"
     onwheel={handleWheel}
     onpointerdown={handlePointerDown}
     onpointermove={handlePointerMove}
     onpointerup={handlePointerUp}
     onpointercancel={handlePointerUp}
 >
-    <!-- Viewport content container (virtually infinite size to center the children) -->
     <div
-        bind:this={contentEl}
         class="absolute flex items-center justify-center"
         style="
-            width: 10000px; 
-            height: 10000px; 
-            left: 50%; 
+            width: 10000px;
+            height: 10000px;
+            left: 50%;
             top: 50%;
             margin-left: -5000px;
             margin-top: -5000px;
@@ -195,30 +180,47 @@
         {@render children()}
     </div>
 
-    <!-- Zoom Controls -->
-    <div
+    <Toolbar.Root
         class="absolute bottom-4 right-4 flex items-stretch bg-white border border-black shadow-sm z-50"
     >
-        <button
-            class="px-3 py-1.5 h-full hover:bg-neutral-100 border-r border-black font-mono text-sm leading-none flex items-center justify-center transition-colors"
-            onclick={() => zoomCenter(0.9)}
-            aria-label="Zoom Out">-</button
-        >
-        <button
-            class="px-3 py-1.5 h-full hover:bg-neutral-100 border-r border-black font-mono text-xs min-w-[4rem] text-center leading-none transition-colors"
-            onclick={resetView}
-            aria-label="Reset Zoom">{Math.round(scale * 100)}%</button
-        >
-        <button
-            class="px-3 py-1.5 h-full hover:bg-neutral-100 border-r border-black font-mono text-sm leading-none flex items-center justify-center transition-colors"
-            onclick={() => zoomCenter(1.1)}
-            aria-label="Zoom In">+</button
-        >
-        <button
-            class="px-3 py-1.5 h-full hover:bg-neutral-100 font-mono text-sm leading-none flex items-center justify-center transition-colors"
-            onclick={centerCanvas}
-            aria-label="Center Canvas"
-            title="Center canvas (keep zoom)">◎</button
-        >
-    </div>
+        <Tooltip content="Zoom out (Ctrl + -)" side="top">
+            <Toolbar.Button
+                class="w-8 h-8 flex items-center justify-center hover:bg-black hover:text-white border-r border-black transition-colors"
+                onclick={() => zoomCenter(0.9)}
+                aria-label="Zoom out"
+            >
+                <ZoomOut class="h-4 w-4" />
+            </Toolbar.Button>
+        </Tooltip>
+
+        <Tooltip content="Reset view (Ctrl + 0)" side="top">
+            <Toolbar.Button
+                class="h-8 px-2 flex items-center justify-center hover:bg-black hover:text-white border-r border-black font-mono text-xs min-w-[3rem] transition-colors"
+                onclick={resetView}
+                aria-label="Reset view"
+            >
+                {Math.round(scale * 100)}%
+            </Toolbar.Button>
+        </Tooltip>
+
+        <Tooltip content="Zoom in (Ctrl + +)" side="top">
+            <Toolbar.Button
+                class="w-8 h-8 flex items-center justify-center hover:bg-black hover:text-white border-r border-black transition-colors"
+                onclick={() => zoomCenter(1.1)}
+                aria-label="Zoom in"
+            >
+                <ZoomIn class="h-4 w-4" />
+            </Toolbar.Button>
+        </Tooltip>
+
+        <Tooltip content="Center canvas" side="top">
+            <Toolbar.Button
+                class="w-8 h-8 flex items-center justify-center hover:bg-black hover:text-white transition-colors"
+                onclick={centerCanvas}
+                aria-label="Center canvas"
+            >
+                <Crosshair class="h-4 w-4" />
+            </Toolbar.Button>
+        </Tooltip>
+    </Toolbar.Root>
 </div>

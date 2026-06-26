@@ -15,7 +15,7 @@
   import type { TracingParams } from '$lib/tracing/types'
   import PngExportSection from './PngExportSection.svelte'
   import SvgExportSection from './SvgExportSection.svelte'
-  import Checkbox from './ui/Checkbox.svelte'
+  import { ToggleGroup } from 'bits-ui'
 
   let {
     getSimulation,
@@ -26,6 +26,30 @@
   let exportingFormat = $state<'png' | 'svg' | null>(null)
   let status = $state('')
   let copiedFormat = $state<'png' | 'svg' | null>(null)
+
+  const filenameKeys = [
+    { key: 'includeSeed', label: 'Seed' },
+    { key: 'includeFont', label: 'Font' },
+    { key: 'includeResolution', label: 'Resolution' },
+    { key: 'includeTimestamp', label: 'Timestamp' },
+    { key: 'includeIteration', label: 'Iteration' },
+    { key: 'includeFeed', label: 'Feed' },
+    { key: 'includeKill', label: 'Kill' },
+  ] as const
+
+  const selectedFilenameValues = $derived(
+    filenameKeys
+      .filter((k) => exportPrefs.filename[k.key])
+      .map((k) => k.key),
+  )
+
+  function setFilenameValues(values: string[]) {
+    const next = new Set(values)
+    for (const { key } of filenameKeys) {
+      exportPrefs.filename[key] = next.has(key)
+    }
+    schedulePersistExportPrefs()
+  }
 
   const filenameCtx = $derived<FilenameContext>({
     seedText: store.seedText,
@@ -187,26 +211,35 @@
     })
   }
 
-  async function handlePngDownload() {
+  /** Run an export action under the shared busy-guard / try-catch / status umbrella. */
+  async function runExport(
+    format: 'png' | 'svg',
+    failLabel: string,
+    action: () => Promise<void>,
+  ): Promise<void> {
     if (exportingFormat) return
-    exportingFormat = 'png'
+    exportingFormat = format
     try {
-      setStatus('Generating PNG…')
-      const blob = await generatePngBlob()
-      triggerDownload(blob, pngFilename, 'image/png')
-      setStatus('Done', 2000)
+      await action()
     } catch (err) {
-      console.error('PNG export failed:', err)
-      setStatus('PNG export failed.', 3000)
+      console.error(`${failLabel}:`, err)
+      setStatus(`${failLabel}.`, 3000)
     } finally {
       exportingFormat = null
     }
   }
 
+  async function handlePngDownload() {
+    await runExport('png', 'PNG export failed', async () => {
+      setStatus('Generating PNG…')
+      const blob = await generatePngBlob()
+      triggerDownload(blob, pngFilename, 'image/png')
+      setStatus('Done', 2000)
+    })
+  }
+
   async function handlePngCopy() {
-    if (exportingFormat) return
-    exportingFormat = 'png'
-    try {
+    await runExport('png', 'PNG copy failed', async () => {
       setStatus('Copying PNG…')
       const blob = await generatePngBlob()
       const ok = await copyPngBlobToClipboard(blob)
@@ -217,33 +250,19 @@
         triggerDownload(blob, pngFilename, 'image/png')
         setStatus('Clipboard unsupported — downloaded PNG', 3000)
       }
-    } catch (err) {
-      console.error('PNG copy failed:', err)
-      setStatus('PNG copy failed.', 3000)
-    } finally {
-      exportingFormat = null
-    }
+    })
   }
 
   async function handleSvgDownload() {
-    if (exportingFormat) return
-    exportingFormat = 'svg'
-    try {
+    await runExport('svg', 'SVG export failed', async () => {
       const svg = await generateSvgString()
       triggerDownload(svg, svgFilename, 'image/svg+xml')
       setStatus('Done', 2000)
-    } catch (err) {
-      console.error('SVG export failed:', err)
-      setStatus('SVG export failed.', 3000)
-    } finally {
-      exportingFormat = null
-    }
+    })
   }
 
   async function handleSvgCopy() {
-    if (exportingFormat) return
-    exportingFormat = 'svg'
-    try {
+    await runExport('svg', 'SVG copy failed', async () => {
       setStatus('Copying SVG…')
       const svg = await generateSvgString()
       const ok = await copyTextToClipboard(svg)
@@ -254,12 +273,7 @@
         triggerDownload(svg, svgFilename, 'image/svg+xml')
         setStatus('Clipboard unsupported — downloaded SVG', 3000)
       }
-    } catch (err) {
-      console.error('SVG copy failed:', err)
-      setStatus('SVG copy failed.', 3000)
-    } finally {
-      exportingFormat = null
-    }
+    })
   }
 </script>
 
@@ -268,35 +282,22 @@
   <div class="flex flex-col gap-2">
     <span class="text-[11px] font-bold uppercase tracking-wider">Filename</span>
 
-    <div class="flex flex-wrap gap-x-3 gap-y-1.5">
-      <Checkbox bind:checked={exportPrefs.filename.includeSeed} onchange={schedulePersistExportPrefs}>
-        Seed
-      </Checkbox>
-
-      <Checkbox bind:checked={exportPrefs.filename.includeFont} onchange={schedulePersistExportPrefs}>
-        Font
-      </Checkbox>
-
-      <Checkbox bind:checked={exportPrefs.filename.includeResolution} onchange={schedulePersistExportPrefs}>
-        Resolution
-      </Checkbox>
-
-      <Checkbox bind:checked={exportPrefs.filename.includeTimestamp} onchange={schedulePersistExportPrefs}>
-        Timestamp
-      </Checkbox>
-
-      <Checkbox bind:checked={exportPrefs.filename.includeIteration} onchange={schedulePersistExportPrefs}>
-        Iteration
-      </Checkbox>
-
-      <Checkbox bind:checked={exportPrefs.filename.includeFeed} onchange={schedulePersistExportPrefs}>
-        Feed
-      </Checkbox>
-
-      <Checkbox bind:checked={exportPrefs.filename.includeKill} onchange={schedulePersistExportPrefs}>
-        Kill
-      </Checkbox>
-    </div>
+    <ToggleGroup.Root
+      type="multiple"
+      value={selectedFilenameValues}
+      onValueChange={(v) => setFilenameValues(v ?? [])}
+      class="flex flex-wrap gap-1.5"
+    >
+      {#each filenameKeys as { key, label }}
+        <ToggleGroup.Item
+          value={key}
+          class="h-6 px-2 text-[10px] font-bold uppercase tracking-wide border border-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 transition-colors {exportPrefs.filename[key] ? 'bg-black text-white' : 'bg-white text-black hover:bg-black hover:text-white'}"
+          aria-pressed={exportPrefs.filename[key]}
+        >
+          {label}
+        </ToggleGroup.Item>
+      {/each}
+    </ToggleGroup.Root>
 
     <p
       class="text-[10px] font-mono text-brutal-secondary break-all border border-black px-2 py-1.5 bg-brutal-surface"

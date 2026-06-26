@@ -37,7 +37,6 @@
   function clearFont() {
     store.seedFont = null;
     store.seedFontName = "";
-    fontLoader.clear();
     onReseed();
   }
 
@@ -50,13 +49,8 @@
 
   $effect(() => {
     store.seedFontSize;
-    if (autoApplyTimer) clearTimeout(autoApplyTimer);
-    autoApplyTimer = setTimeout(() => {
-      onReseed();
-    }, 160);
-    return () => {
-      if (autoApplyTimer) clearTimeout(autoApplyTimer);
-    };
+    autoApplyTimer = setTimeout(onReseed, 160);
+    return () => clearTimeout(autoApplyTimer ?? undefined);
   });
 </script>
 
@@ -82,8 +76,8 @@
     id="font-size-slider"
     label="Size"
     bind:value={store.seedFontSize}
-    min={20}
-    max={500}
+    min={10}
+    max={1000}
     step={1}
     suffix="px"
   />

@@ -4,6 +4,8 @@
     import { simController } from "$lib/store/simController";
     import { DropdownMenu } from "bits-ui";
     import Tooltip from "./ui/Tooltip.svelte";
+    import { setGlobalCursor, restoreGlobalCursor } from "$lib/utils/cursorLock";
+    import { blurActiveElement } from "$lib/utils/focus";
     import ChevronsLeft from "lucide-svelte/icons/chevrons-left";
     import ChevronLeft from "lucide-svelte/icons/chevron-left";
     import ChevronDown from "lucide-svelte/icons/chevron-down";
@@ -12,21 +14,13 @@
     import ChevronRight from "lucide-svelte/icons/chevron-right";
     import ChevronsRight from "lucide-svelte/icons/chevrons-right";
 
-    const bufferItems = [
-        { value: "60", label: "60" },
-        { value: "120", label: "120" },
-        { value: "180", label: "180" },
-        { value: "300", label: "300" },
-        { value: "480", label: "480" }
-    ];
-
-    function handleReplayWindowChange(value: string) {
-        simController.handleReplayWindowChange(
-            Number(value),
-        );
-    }
+    const bufferItems = [60, 120, 180, 300, 480].map((value) => ({
+        value: String(value),
+        label: String(value),
+    }));
 
     // --- Derived values ---
+
     const bufferFillPct = $derived(
         replay.maxFramesBack > 0
             ? (replay.frames.length / replay.maxFramesBack) * 100
@@ -39,9 +33,15 @@
             : 0,
     );
 
-    function closestFrameIndex(iteration: number): { index: number; diff: number } {
+    interface ClosestFrame {
+        index: number;
+        diff: number;
+    }
+
+    function closestFrameIndex(iteration: number): ClosestFrame {
         const len = replay.frames.length;
-        let lo = 0, hi = len;
+        let lo = 0;
+        let hi = len;
         while (lo < hi) {
             const mid = (lo + hi) >> 1;
             if (replay.frames[mid].iteration < iteration) {
@@ -52,41 +52,46 @@
         }
         const idx = Math.min(lo, len - 1);
         if (idx === 0) {
-            return { index: 0, diff: Math.abs(replay.frames[0].iteration - iteration) };
+            return {
+                index: 0,
+                diff: Math.abs(replay.frames[0].iteration - iteration),
+            };
         }
         const diffIdx = Math.abs(replay.frames[idx].iteration - iteration);
         const diffPrev = Math.abs(replay.frames[idx - 1].iteration - iteration);
-        return diffPrev <= diffIdx ? { index: idx - 1, diff: diffPrev } : { index: idx, diff: diffIdx };
+        return diffPrev <= diffIdx
+            ? { index: idx - 1, diff: diffPrev }
+            : { index: idx, diff: diffIdx };
     }
 
-    let pauseMarkers = $derived.by(() => {
+    interface PauseMarker {
+        pct: number;
+        label: number;
+        iteration: number;
+        frameIndex: number;
+        showLabel: boolean;
+    }
+
+    const pauseMarkers = $derived.by((): PauseMarker[] => {
         if (
             !store.pauseIterations ||
             store.pauseIterations.length === 0 ||
-            !replay.frames ||
             replay.frames.length < 2
         )
             return [];
 
-        const markers: {
-            pct: number;
-            label: number;
-            iteration: number;
-            frameIndex: number;
-            showLabel: boolean;
-        }[] = [];
         const maxIndex = replay.frames.length - 1;
+        const markers: PauseMarker[] = [];
 
-        for (let markerIndex = 0; markerIndex < store.pauseIterations.length; markerIndex++) {
-            const iter = store.pauseIterations[markerIndex];
-            const { index: closestIndex, diff } = closestFrameIndex(iter);
-
-            if (closestIndex >= 0 && diff < 100) {
+        for (let i = 0; i < store.pauseIterations.length; i++) {
+            const iter = store.pauseIterations[i];
+            const { index, diff } = closestFrameIndex(iter);
+            if (index >= 0 && diff < 100) {
                 markers.push({
-                    pct: (closestIndex / maxIndex) * 100,
-                    label: markerIndex + 1,
+                    pct: (index / maxIndex) * 100,
+                    label: i + 1,
                     iteration: iter,
-                    frameIndex: closestIndex,
+                    frameIndex: index,
                     showLabel: true,
                 });
             }
@@ -98,7 +103,6 @@
             if (marker.pct - lastShownPct < LABEL_MIN_GAP_PCT) {
                 marker.showLabel = false;
             } else {
-                marker.showLabel = true;
                 lastShownPct = marker.pct;
             }
         }
@@ -109,19 +113,28 @@
     const activePauseLabel = $derived.by(() => {
         if (pauseMarkers.length === 0 || replay.frames.length < 2) return null;
         const cursor = Math.max(0, Math.min(replay.frames.length - 1, replay.cursor));
-        let best: typeof pauseMarkers[number] | null = null;
-        let bestDist = Infinity;
-        for (const marker of pauseMarkers) {
-            const dist = Math.abs(marker.frameIndex - cursor);
-            if (dist < bestDist) {
-                bestDist = dist;
-                best = marker;
-            }
-        }
-        return best;
+        return pauseMarkers.reduce<PauseMarker | null>(
+            (best, marker) => {
+                const dist = Math.abs(marker.frameIndex - cursor);
+                return dist < (best ? Math.abs(best.frameIndex - cursor) : Infinity)
+                    ? marker
+                    : best;
+            },
+            null,
+        );
     });
 
+    function markerClasses(marker: PauseMarker) {
+        const active = activePauseLabel?.label === marker.label;
+        return {
+            bar: active ? "bg-black" : "bg-black/45",
+            dot: active ? "bg-black" : "bg-black/65",
+            label: active ? "bg-black text-white" : "bg-white/85 text-black/65",
+        };
+    }
+
     // --- Custom track drag logic ---
+
     let trackEl: HTMLDivElement;
     let isDragging = $state(false);
 
@@ -137,6 +150,7 @@
     function handleTrackMouseDown(e: MouseEvent) {
         e.preventDefault();
         isDragging = true;
+        setGlobalCursor("grabbing");
         seekFromPointer(e);
         window.addEventListener("mousemove", handleWindowMouseMove);
         window.addEventListener("mouseup", handleWindowMouseUp);
@@ -149,6 +163,7 @@
 
     function handleWindowMouseUp() {
         isDragging = false;
+        restoreGlobalCursor();
         window.removeEventListener("mousemove", handleWindowMouseMove);
         window.removeEventListener("mouseup", handleWindowMouseUp);
     }
@@ -157,8 +172,16 @@
         return () => {
             window.removeEventListener("mousemove", handleWindowMouseMove);
             window.removeEventListener("mouseup", handleWindowMouseUp);
+            if (isDragging) restoreGlobalCursor();
         };
     });
+
+    // --- Playback button classes ---
+
+    const stepBtnClass =
+        "w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed";
+    const playBtnClass =
+        "w-10 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black";
 </script>
 
 <div class="flex flex-col bg-white p-2 shrink-0">
@@ -173,7 +196,9 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
             bind:this={trackEl}
-            class="flex-1 relative h-5 border border-black bg-neutral-100 cursor-pointer select-none"
+            class="flex-1 relative h-5 border border-black bg-neutral-100 select-none {isDragging
+                ? 'cursor-grabbing'
+                : 'cursor-grab'}"
             onmousedown={handleTrackMouseDown}
         >
             <!-- Buffer fill -->
@@ -184,25 +209,20 @@
 
             <!-- Pause markers -->
             {#each pauseMarkers as marker}
+                {@const classes = markerClasses(marker)}
                 <div
-                    class="absolute top-[2px] bottom-[2px] w-px pointer-events-none {activePauseLabel && activePauseLabel.label === marker.label
-                        ? 'bg-black'
-                        : 'bg-black/45'}"
+                    class="absolute top-[2px] bottom-[2px] w-px pointer-events-none {classes.bar}"
                     style={`left: ${marker.pct}%;`}
                 ></div>
 
                 <div
-                    class="absolute -translate-x-1/2 w-[3px] h-[3px] rounded-full pointer-events-none {activePauseLabel && activePauseLabel.label === marker.label
-                        ? 'bg-black'
-                        : 'bg-black/65'}"
+                    class="absolute -translate-x-1/2 w-[3px] h-[3px] rounded-full pointer-events-none {classes.dot}"
                     style={`left: ${marker.pct}%; top: 1px;`}
                 ></div>
 
                 {#if marker.showLabel}
                     <div
-                        class="absolute bottom-[1px] -translate-x-1/2 text-[9px] font-mono leading-none px-0.5 rounded-sm pointer-events-none {activePauseLabel && activePauseLabel.label === marker.label
-                            ? 'bg-black text-white'
-                            : 'bg-white/85 text-black/65'}"
+                        class="absolute bottom-[1px] -translate-x-1/2 text-[9px] font-mono leading-none px-0.5 rounded-sm pointer-events-none {classes.label}"
                         style={`left: ${marker.pct}%;`}
                     >
                         {marker.label}
@@ -210,7 +230,7 @@
                 {/if}
 
                 <div
-                    class="absolute inset-y-0 w-3 -translate-x-1/2 cursor-help"
+                    class="absolute inset-y-0 w-3 -translate-x-1/2 cursor-grab"
                     style={`left: ${marker.pct}%;`}
                     title={`Pause #${marker.label}\nIteration: ${marker.iteration}\nFrame: ${marker.frameIndex + 1}`}
                 ></div>
@@ -232,19 +252,32 @@
         </div>
 
         <Tooltip content="Frames captured / buffer size" side="top">
-            <span class="text-[10px] text-black/50 font-mono text-right inline-flex items-center gap-2 pr-2">
+            <span
+                class="text-[10px] text-black/50 font-mono text-right inline-flex items-center gap-2 pr-2"
+            >
                 <span class="text-black/70">{replay.frames.length}/</span>
                 <Tooltip content="Change buffer size" side="top">
                     <DropdownMenu.Root>
-                        <DropdownMenu.Trigger class="bg-transparent text-black/70 hover:text-black font-mono border-none p-0 m-0 cursor-pointer h-auto outline-none focus-visible:ring-0 underline decoration-dashed decoration-black/40 hover:decoration-black flex items-center gap-0.5">
-                            {replay.maxFramesBack} <ChevronDown class="w-3 h-3" strokeWidth={3} />
+                        <DropdownMenu.Trigger
+                            class="bg-transparent text-black/70 hover:text-black font-mono border-none p-0 m-0 cursor-pointer h-auto outline-none focus-visible:ring-0 underline decoration-dashed decoration-black/40 hover:decoration-black flex items-center gap-0.5"
+                        >
+                            {replay.maxFramesBack}
+                            <ChevronDown class="w-3 h-3" strokeWidth={3} />
                         </DropdownMenu.Trigger>
                         <DropdownMenu.Portal>
-                            <DropdownMenu.Content class="z-50 min-w-20 bg-white border border-black shadow-md p-1 outline-none" sideOffset={4}>
+                            <DropdownMenu.Content
+                                class="z-50 min-w-20 bg-white border border-black shadow-md p-1 outline-none"
+                                sideOffset={4}
+                            >
                                 {#each bufferItems as item}
                                     <DropdownMenu.Item
                                         class="relative flex w-full cursor-pointer select-none items-center px-2 py-1.5 text-xs font-mono outline-none hover:bg-neutral-100 data-[highlighted]:bg-black data-[highlighted]:text-white"
-                                        onSelect={() => handleReplayWindowChange(item.value)}
+                                        onSelect={() => {
+                                            simController.handleReplayWindowChange(
+                                                Number(item.value),
+                                            );
+                                            blurActiveElement();
+                                        }}
                                     >
                                         {item.label}
                                     </DropdownMenu.Item>
@@ -262,7 +295,7 @@
         <div class="flex items-center border border-black">
             <Tooltip content="Jump back 10 frames" side="top">
                 <button
-                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    class={stepBtnClass}
                     onclick={() => simController.handleReplayJump(-10)}
                     disabled={replay.frames.length === 0}
                     aria-label="Jump back 10 frames"
@@ -270,10 +303,10 @@
                     <ChevronsLeft class="h-3.5 w-3.5" />
                 </button>
             </Tooltip>
-            
+
             <Tooltip content="Step back in recent history (ArrowLeft)" side="top">
                 <button
-                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    class={stepBtnClass}
                     onclick={() => simController.handleReplayStep(-1)}
                     disabled={replay.frames.length === 0}
                     aria-label="Step back in recent history"
@@ -282,11 +315,20 @@
                 </button>
             </Tooltip>
 
-            <Tooltip content={store.isRunning ? "Pause (Space)" : "Play from selected history frame (Space)"} side="top">
+            <Tooltip
+                content={store.isRunning
+                    ? "Pause (Space)"
+                    : "Play from selected history frame (Space)"}
+                side="top"
+            >
                 <button
-                    class="w-10 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black {store.isRunning ? 'hover:bg-black hover:text-white' : 'bg-black text-white hover:bg-white hover:text-black'}"
+                    class="{playBtnClass} {store.isRunning
+                        ? 'hover:bg-black hover:text-white'
+                        : 'bg-black text-white hover:bg-white hover:text-black'}"
                     onclick={() => simController.handlePause()}
-                    aria-label={store.isRunning ? "Pause playback" : "Play from history"}
+                    aria-label={store.isRunning
+                        ? "Pause playback"
+                        : "Play from history"}
                 >
                     {#if store.isRunning}
                         <Pause class="h-4 w-4" />
@@ -298,7 +340,7 @@
 
             <Tooltip content="Step forward in recent history (ArrowRight)" side="top">
                 <button
-                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none border-r border-black hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    class={stepBtnClass}
                     onclick={() => simController.handleReplayStep(1)}
                     disabled={replay.frames.length === 0}
                     aria-label="Step forward in recent history"
@@ -309,7 +351,7 @@
 
             <Tooltip content="Jump forward 10 frames" side="top">
                 <button
-                    class="w-9 h-9 inline-flex items-center justify-center shrink-0 p-0 leading-none hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="{stepBtnClass} border-r-0"
                     onclick={() => simController.handleReplayJump(10)}
                     disabled={replay.frames.length === 0}
                     aria-label="Jump forward 10 frames"

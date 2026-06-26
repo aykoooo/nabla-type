@@ -2,6 +2,8 @@
     import { store } from "$lib/store/simStore.svelte";
     import { simController } from "$lib/store/simController";
     import Tooltip from "./ui/Tooltip.svelte";
+    import Minimize2 from "lucide-svelte/icons/minimize-2";
+    import Maximize2 from "lucide-svelte/icons/maximize-2";
     import Undo2 from "lucide-svelte/icons/undo-2";
     import Download from "lucide-svelte/icons/download";
     import RefreshCw from "lucide-svelte/icons/refresh-cw";
@@ -9,6 +11,12 @@
 
     const canUndo = $derived(store.hasPauseSnapshot || store.hasParamHistory);
     const canMin = $derived(store.seedText.trim().length > 0);
+
+    const btnClass =
+        "w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-inherit";
+    const dangerBtnClass =
+        "w-7 h-7 flex flex-col items-center justify-center border border-black text-red-600 hover:bg-red-600 hover:text-white group";
+    const dividerClass = "w-7 h-px bg-black/20 my-1";
 </script>
 
 <div
@@ -16,27 +24,29 @@
 >
     <Tooltip content="Crop canvas to fit simulation" side="right">
         <button
-            class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-inherit"
+            class={btnClass}
             onclick={() => simController.handleMin()}
             disabled={!canMin}
+            aria-label="Crop canvas to fit simulation"
         >
-            <span class="text-[9px] font-bold leading-tight uppercase">Min</span>
+            <Minimize2 class="h-4 w-4" />
         </button>
     </Tooltip>
     <Tooltip content="Maximize canvas (F)" side="right">
         <button
-            class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
+            class={btnClass}
             onclick={() => simController.handleMax()}
+            aria-label="Maximize canvas"
         >
-            <span class="text-[9px] font-bold leading-tight uppercase">Max</span>
+            <Maximize2 class="h-4 w-4" />
         </button>
     </Tooltip>
 
-    <div class="w-7 h-px bg-black/20 my-1"></div>
+    <div class={dividerClass}></div>
 
     <Tooltip content="Undo to last paused snapshot (Ctrl+Z)" side="right">
         <button
-            class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-inherit"
+            class={btnClass}
             onclick={() => simController.handleUndo()}
             disabled={!canUndo}
             aria-label="Undo to last paused snapshot"
@@ -47,7 +57,7 @@
 
     <Tooltip content="Save as PNG (Ctrl+S)" side="right">
         <button
-            class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
+            class={btnClass}
             onclick={() => simController.handleSave()}
             aria-label="Save as PNG"
         >
@@ -55,11 +65,11 @@
         </button>
     </Tooltip>
 
-    <div class="w-7 h-px bg-black/20 my-1"></div>
+    <div class={dividerClass}></div>
 
     <Tooltip content="Reset (R)" side="right">
         <button
-            class="w-7 h-7 flex flex-col items-center justify-center border border-black hover:bg-black hover:text-white group"
+            class={btnClass}
             onclick={() => simController.handleLoop()}
             aria-label="Reset simulation"
         >
@@ -69,7 +79,7 @@
 
     <Tooltip content="Clear simulation (Del)" side="right">
         <button
-            class="w-7 h-7 flex flex-col items-center justify-center border border-black text-red-600 hover:bg-red-600 hover:text-white group"
+            class={dangerBtnClass}
             onclick={() => simController.handleTrash()}
             aria-label="Clear simulation"
         >
@@ -77,4 +87,3 @@
         </button>
     </Tooltip>
 </div>
-

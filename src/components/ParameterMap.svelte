@@ -4,7 +4,6 @@
   import type { SimParams } from "$lib/simulation/presets";
   import { loadParameterMap, type ParameterMapData } from "$lib/map/loadParameterMap";
   import { buildActiveLUT } from "$lib/colormaps/buildLUT";
-  import { buildParameterMapDefaultLUT } from "$lib/colormaps/maps/parameterMapDefault";
   import {
     pixelToWarpedParams,
     warpedParamsToPixel,
@@ -12,9 +11,18 @@
     FEED_MAX,
     KILL_ABS_MIN,
     KILL_ABS_MAX,
+    B_MAX_KARL_SIMS_UINT8,
   } from "$lib/warp/karlSimsWarp";
   import MathInput from "./ui/MathInput.svelte";
   import CrosshairMarker from "./ui/CrosshairMarker.svelte";
+
+  function buildParameterMapLUT(): Uint8Array {
+    return buildActiveLUT(store.activeColormapId, store.customGradientStops) ?? new Uint8Array(256 * 4).fill(255);
+  }
+
+  const NATIVE_W = 512;
+  const NATIVE_H = 512;
+  const KEYBOARD_STEP = 0.001;
 
   let { src }: { src: string } = $props();
 
@@ -29,23 +37,18 @@
   let isHovering = $state(false);
   let dragging = $state(false);
 
-  const NATIVE_W = 512;
-  const NATIVE_H = 512;
+  const crossPos = $derived.by(() =>
+    mapData ? warpedParamsToPixel(store.params.feed, store.params.kill) : { u: 0.5, v: 0.5 }
+  );
 
-  const crossPos = $derived.by(() => {
-    if (!mapData) return { u: 0.5, v: 0.5 };
-    return warpedParamsToPixel(store.params.feed, store.params.kill);
-  });
-
-  const feedPct = $derived.by(() => {
-    const t = (store.params.feed - FEED_MIN) / (FEED_MAX - FEED_MIN);
+  function pct(value: number, min: number, max: number): number {
+    const t = (value - min) / (max - min);
     return Math.max(0, Math.min(100, t * 100));
-  });
+  }
 
-  const killPct = $derived.by(() => {
-    const t = (store.params.kill - KILL_ABS_MIN) / (KILL_ABS_MAX - KILL_ABS_MIN);
-    return Math.max(0, Math.min(100, t * 100));
-  });
+  const feedPct = $derived.by(() => pct(store.params.feed, FEED_MIN, FEED_MAX));
+  const killPct = $derived.by(() => pct(store.params.kill, KILL_ABS_MIN, KILL_ABS_MAX));
+  const showHover = $derived(isHovering && !dragging);
 
   async function loadMap() {
     try {
@@ -63,14 +66,9 @@
     if (!mapData || !canvasEl) return;
     const ctx = canvasEl.getContext("2d")!;
 
-    const previewActive = store.colorFocused;
-    const lut = previewActive
-      ? buildActiveLUT(store.activeColormapId, store.customGradientStops) ?? buildParameterMapDefaultLUT()
-      : buildParameterMapDefaultLUT();
+    const lut = buildParameterMapLUT();
 
-    const pixels = mapData.pixels;
-    const w = mapData.width;
-    const h = mapData.height;
+    const { width: w, height: h, pixels } = mapData;
 
     if (!imageDataCache || imageDataCache.width !== w || imageDataCache.height !== h) {
       imageDataCache = ctx.createImageData(w, h);
@@ -81,7 +79,10 @@
       const srcRow = h - 1 - py;
       for (let px = 0; px < w; px++) {
         const v = pixels[srcRow * w + px];
-        const idx = v * 4;
+        // Param-map pixels are uint8 B*255 (max ~140 in the Karl-Sims window).
+        // Normalize to [0,1] so the active colormap's full range is used.
+        const t = Math.min(1, v / B_MAX_KARL_SIMS_UINT8);
+        const idx = Math.round(t * 255) * 4;
         const di = (py * w + px) * 4;
         id.data[di + 0] = lut[idx + 0];
         id.data[di + 1] = lut[idx + 1];
@@ -94,21 +95,20 @@
   }
 
   $effect(() => {
-    const _canvas = canvasEl;
-    const _map = mapData;
-    const _focused = store.colorFocused;
-    const _activeId = store.activeColormapId;
-    if (_canvas && _map) renderMap();
+    canvasEl;
+    mapData;
+    store.activeColormapId;
+    if (canvasEl && mapData) renderMap();
   });
 
-  let colormapDebounceTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+  let gradientDebounce: ReturnType<typeof setTimeout> | undefined;
   $effect(() => {
     store.customGradientStops;
-    clearTimeout(colormapDebounceTimer);
-    colormapDebounceTimer = setTimeout(() => {
+    clearTimeout(gradientDebounce);
+    gradientDebounce = setTimeout(() => {
       if (canvasEl && mapData) renderMap();
     }, 50);
-    return () => clearTimeout(colormapDebounceTimer);
+    return () => clearTimeout(gradientDebounce);
   });
 
   function getPointerPos(e: PointerEvent | MouseEvent): { u: number; v: number } {
@@ -116,10 +116,6 @@
     const u = Math.max(0, Math.min(1, e.offsetX / wrapperEl.clientWidth));
     const v = Math.max(0, Math.min(1, e.offsetY / wrapperEl.clientHeight));
     return { u, v };
-  }
-
-  function pushBeforeChange(nextParams: SimParams) {
-    pushParamHistory(nextParams);
   }
 
   function applyPointerParams(e: PointerEvent | MouseEvent) {
@@ -136,7 +132,7 @@
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragging = true;
-    pushBeforeChange(store.params);
+    pushParamHistory({ ...store.params });
     applyPointerParams(e);
   }
 
@@ -153,7 +149,7 @@
     }
   }
 
-  function handlePointerUp(e: PointerEvent) {
+  function handlePointerEnd(e: PointerEvent) {
     if (dragging) {
       dragging = false;
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
@@ -164,8 +160,6 @@
     if (!dragging) isHovering = false;
   }
 
-  // Keyboard nudge.
-  const KEYBOARD_STEP = 0.001;
   function handleKeyDown(e: KeyboardEvent) {
     if (!e.key.startsWith("Arrow")) return;
     e.preventDefault();
@@ -186,36 +180,35 @@
     nextKill = Math.max(KILL_ABS_MIN, Math.min(KILL_ABS_MAX, nextKill));
 
     if (nextFeed !== prev.feed || nextKill !== prev.kill) {
-      pushBeforeChange(prev);
+      pushParamHistory(prev);
       store.params.feed = nextFeed;
       store.params.kill = nextKill;
     }
   }
 
-  // Manual input editing: push previous params to history when blur commits a change.
-  let feedBeforeEdit = $state(store.params.feed);
+  // Manual input editing: remember values at focus so blur can push history.
+  let feedBeforeEdit = store.params.feed;
+  let killBeforeEdit = store.params.kill;
+
   function onFeedFocus() {
     feedBeforeEdit = store.params.feed;
   }
   function onFeedBlur() {
     if (store.params.feed !== feedBeforeEdit) {
-      pushBeforeChange({ ...store.params, feed: feedBeforeEdit });
+      pushParamHistory({ ...store.params, feed: feedBeforeEdit });
     }
   }
 
-  let killBeforeEdit = $state(store.params.kill);
   function onKillFocus() {
     killBeforeEdit = store.params.kill;
   }
   function onKillBlur() {
     if (store.params.kill !== killBeforeEdit) {
-      pushBeforeChange({ ...store.params, kill: killBeforeEdit });
+      pushParamHistory({ ...store.params, kill: killBeforeEdit });
     }
   }
 
-  onMount(() => {
-    loadMap();
-  });
+  onMount(loadMap);
 </script>
 
 <div class="flex flex-col gap-2 select-none">
@@ -237,8 +230,8 @@
       tabindex="0"
       onpointerdown={handlePointerDown}
       onpointermove={handlePointerMove}
-      onpointerup={handlePointerUp}
-      onpointercancel={handlePointerUp}
+      onpointerup={handlePointerEnd}
+      onpointercancel={handlePointerEnd}
       onpointerleave={handlePointerLeave}
       onkeydown={handleKeyDown}
     >
@@ -257,7 +250,7 @@
           class="absolute pointer-events-none"
           style="left: {left}%; top: {top}%; width: 16px; height: 16px; transform: translate(-50%, -50%);"
         >
-          <CrosshairMarker size={16} />
+          <CrosshairMarker size={18} />
         </div>
       {/if}
     </div>
@@ -276,7 +269,7 @@
               onfocus={onFeedFocus}
               onblur={onFeedBlur}
             />
-            {#if isHovering && !dragging}
+            {#if showHover}
               <span class="text-[10px] text-neutral-400 tabular-nums font-mono">→ {hoverFeed.toFixed(4)}</span>
             {/if}
           </div>
@@ -299,7 +292,7 @@
               onfocus={onKillFocus}
               onblur={onKillBlur}
             />
-            {#if isHovering && !dragging}
+            {#if showHover}
               <span class="text-[10px] text-neutral-400 tabular-nums font-mono">→ {hoverKill.toFixed(4)}</span>
             {/if}
           </div>

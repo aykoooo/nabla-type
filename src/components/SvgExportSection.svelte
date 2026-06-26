@@ -22,8 +22,8 @@
   const viewW = $derived(Math.max(1, store.resolution.width + exportPrefs.svg.padding * 2))
   const viewH = $derived(Math.max(1, store.resolution.height + exportPrefs.svg.padding * 2))
 
-  function setScaleSnap(s: number) {
-    exportPrefs.svg.threshold = s
+  function setThreshold(value: number) {
+    exportPrefs.svg.threshold = value
     schedulePersistExportPrefs()
   }
 
@@ -75,7 +75,7 @@
         <button
           type="button"
           class={snapButtonClass(exportPrefs.svg.threshold === t)}
-          onclick={() => setScaleSnap(t)}
+          onclick={() => setThreshold(t)}
         >
           {t}
         </button>
@@ -191,7 +191,7 @@
   <div class="flex gap-2">
     <button
       type="button"
-      class="flex-1 h-7 px-3 inline-flex items-center justify-center gap-1.5 border border-black bg-black text-white text-xs font-bold uppercase tracking-wide disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 transition-colors"
+      class="flex-1 h-7 px-3 inline-flex items-center justify-center gap-1.5 border border-black bg-black text-white text-xs font-bold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 transition-colors"
       onclick={onDownload}
       disabled={busy}
       title="Download SVG"
@@ -201,7 +201,7 @@
     </button>
     <button
       type="button"
-      class="h-7 px-3 inline-flex items-center justify-center gap-1.5 border border-black bg-white text-black hover:bg-black hover:text-white text-xs font-bold uppercase tracking-wide disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 transition-colors"
+      class="h-7 px-3 inline-flex items-center justify-center gap-1.5 border border-black bg-white text-black hover:bg-black hover:text-white text-xs font-bold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40 transition-colors"
       onclick={onCopy}
       disabled={busy}
       aria-label="Copy SVG code to clipboard"
