@@ -1,8 +1,13 @@
 import createREGL from 'regl'
 import type { SimParams } from './presets'
+import type { BoundaryMode } from '$lib/store/simStore.svelte'
 import quadVertSrc from './shaders/quad.vert?raw'
 import simFragSrc from './shaders/simulation.frag?raw'
 import displayFragSrc from './shaders/display.frag?raw'
+
+function isPowerOfTwo(n: number): boolean {
+    return (n & (n - 1)) === 0 && n > 0
+}
 
 type ReglInstance = ReturnType<typeof createREGL>
 type ReglTexture2D = ReturnType<ReglInstance['texture']>
@@ -24,11 +29,13 @@ export class GrayScott {
     private width: number
     private height: number
 
-    private pingTex: ReglTexture2D
-    private pongTex: ReglTexture2D
-    private pingFBO: ReglFBO
-    private pongFBO: ReglFBO
+    private pingTex!: ReglTexture2D
+    private pongTex!: ReglTexture2D
+    private pingFBO!: ReglFBO
+    private pongFBO!: ReglFBO
     private ping = true // true = read from pingFBO, write to pongFBO
+
+    private boundaryMode: BoundaryMode = 'clamp'
 
     private feedMapTex: ReglTexture2D
     private killMapTex: ReglTexture2D
@@ -69,10 +76,7 @@ export class GrayScott {
         })
 
         // Create ping-pong textures and framebuffers
-        this.pingTex = this.createFloatTexture(width, height)
-        this.pongTex = this.createFloatTexture(width, height)
-        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
-        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
+        this.createPingPongFBOs()
 
         this.feedMapTex = this.createParamMapTexture()
         this.killMapTex = this.createParamMapTexture()
@@ -123,21 +127,37 @@ export class GrayScott {
             uniforms: {
                 u_state: regl.prop('u_state'),
                 u_colormap: this.colormapTex,
-                u_useLUT: regl.prop('u_useLUT'),
             },
             count: 6,
             depth: { enable: false },
         })
     }
 
-    private createFloatTexture(width: number, height: number): ReglTexture2D {
+    private effectiveWrap(mode: BoundaryMode): BoundaryMode {
+        return mode !== 'clamp' && (!isPowerOfTwo(this.width) || !isPowerOfTwo(this.height)) ? 'clamp' : mode
+    }
+
+    private uploadFloatData(tex: ReglTexture2D, w: number, h: number, data: Float32Array, wrap: BoundaryMode): void {
+        tex({ width: w, height: h, data, format: 'rgba', type: 'float', min: 'nearest', mag: 'nearest', wrap })
+    }
+
+    private createPingPongFBOs(wrap?: BoundaryMode): void {
+        this.pingTex = this.createFloatTexture(this.width, this.height, wrap)
+        this.pongTex = this.createFloatTexture(this.width, this.height, wrap)
+        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
+        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
+    }
+
+    private createFloatTexture(width: number, height: number, wrap?: BoundaryMode): ReglTexture2D {
+        const mode: BoundaryMode = wrap ?? this.boundaryMode
+        const resolved = mode !== 'clamp' && (!isPowerOfTwo(width) || !isPowerOfTwo(height)) ? 'clamp' : mode
         return this.regl.texture({
             width, height,
             format: 'rgba',
             type: 'float',
             min: 'nearest',
             mag: 'nearest',
-            wrap: 'clamp',
+            wrap: resolved,
         })
     }
 
@@ -168,6 +188,36 @@ export class GrayScott {
         })
     }
 
+    public setBoundaryMode(mode: BoundaryMode): void {
+        let resolved = this.effectiveWrap(mode)
+        if (resolved === this.boundaryMode) return
+
+        const state = this.readStateFloat()
+
+        this.pingTex.destroy()
+        this.pongTex.destroy()
+        this.pingFBO.destroy()
+        this.pongFBO.destroy()
+
+        try {
+            this.createPingPongFBOs(resolved)
+        } catch (e) {
+            if (resolved !== 'clamp') {
+                resolved = 'clamp'
+                this.createPingPongFBOs('clamp')
+            } else {
+                throw e
+            }
+        }
+
+        const wrap = resolved
+        this.uploadFloatData(this.pingTex, this.width, this.height, state, wrap)
+        this.uploadFloatData(this.pongTex, this.width, this.height, state, wrap)
+        this.ping = true
+        this.boundaryMode = resolved
+        this.simCmd = this.createSimCommand()
+    }
+
     public clearState(): void {
         // Initialize: A=1, B=0 everywhere
         const data = new Float32Array(this.width * this.height * 4)
@@ -177,34 +227,16 @@ export class GrayScott {
             data[i * 4 + 2] = 0.0
             data[i * 4 + 3] = 1.0
         }
-        // Reinitialize textures with data using regl's texture(opts) call
-        this.pingTex({
-            width: this.width, height: this.height,
-            data, format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
-        this.pongTex({
-            width: this.width, height: this.height,
-            data, format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
-        this.ping = true
+        this.injectSeedFloat(data)
     }
 
     /**
      * Inject seed from a Float32Array directly (from SeedGenerator.imageDataToSimState)
      */
     injectSeedFloat(data: Float32Array): void {
-        this.pingTex({
-            width: this.width, height: this.height,
-            data, format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
-        this.pongTex({
-            width: this.width, height: this.height,
-            data, format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
+        const wrap = this.effectiveWrap(this.boundaryMode)
+        this.uploadFloatData(this.pingTex, this.width, this.height, data, wrap)
+        this.uploadFloatData(this.pongTex, this.width, this.height, data, wrap)
         this.ping = true
     }
 
@@ -244,11 +276,10 @@ export class GrayScott {
     /**
      * Render the current state to screen using the active colormap
      */
-    render(useLUT: boolean): void {
+    render(): void {
         const current = this.ping ? this.pingFBO : this.pongFBO
         this.displayCmd({
             u_state: current.color[0],
-            u_useLUT: useLUT,
         })
     }
 
@@ -287,10 +318,7 @@ export class GrayScott {
         this.pingFBO.destroy()
         this.pongFBO.destroy()
 
-        this.pingTex = this.createFloatTexture(width, height)
-        this.pongTex = this.createFloatTexture(width, height)
-        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
-        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
+        this.createPingPongFBOs()
 
         // Build new data: copy old pixels into the center, fill rest with A=1, B=0
         const newData = new Float32Array(width * height * 4)
@@ -318,16 +346,9 @@ export class GrayScott {
             }
         }
 
-        this.pingTex({
-            width, height, data: newData,
-            format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
-        this.pongTex({
-            width, height, data: newData,
-            format: 'rgba', type: 'float',
-            min: 'nearest', mag: 'nearest', wrap: 'clamp',
-        })
+        const wrap = this.effectiveWrap(this.boundaryMode)
+        this.uploadFloatData(this.pingTex, width, height, newData, wrap)
+        this.uploadFloatData(this.pongTex, width, height, newData, wrap)
         this.ping = true
 
         // Recreate sim command with new resolution
@@ -394,10 +415,7 @@ export class GrayScott {
     }
 
     private handleContextRestored = (e: Event) => {
-        this.pingTex = this.createFloatTexture(this.width, this.height)
-        this.pongTex = this.createFloatTexture(this.width, this.height)
-        this.pingFBO = this.regl.framebuffer({ color: this.pingTex, depthStencil: false }) as ReglFBO
-        this.pongFBO = this.regl.framebuffer({ color: this.pongTex, depthStencil: false }) as ReglFBO
+        this.createPingPongFBOs()
 
         this.feedMapTex = this.createParamMapTexture()
         this.killMapTex = this.createParamMapTexture()
