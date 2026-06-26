@@ -93,7 +93,7 @@ export class SimLoopManager {
                     ? Math.max(0, this.simAccumulatorMs - simInterval)
                     : 0;
             }
-            const clampedSteps = Math.max(
+            let clampedSteps = Math.max(
                 1,
                 Math.min(
                     MAX_STEPS_PER_FRAME,
@@ -101,10 +101,21 @@ export class SimLoopManager {
                 ),
             );
 
-            // Advance simulation — pass pre-clamped step count to avoid redundant clamping in step()
-            this.sim.step(store.params, clampedSteps);
-            didSimAdvance = true;
-            store.iterationCount += clampedSteps;
+            // Cap steps to avoid overshooting the target iteration
+            if (store.targetIteration > 0) {
+                const remaining =
+                    store.targetIteration - store.iterationCount;
+                clampedSteps = Math.min(
+                    clampedSteps,
+                    Math.max(0, remaining),
+                );
+            }
+
+            if (clampedSteps > 0) {
+                this.sim.step(store.params, clampedSteps);
+                didSimAdvance = true;
+                store.iterationCount += clampedSteps;
+            }
 
             if (
                 store.targetIteration > 0 &&

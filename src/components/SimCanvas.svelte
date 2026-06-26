@@ -48,7 +48,9 @@
             activeColormapId: store.activeColormapId,
             customColorHex: store.customColorHex,
             customSeedSourceId: store.customSeedSourceId,
-            customGradientStops: [...store.customGradientStops],
+            customGradientStops: store.customGradientStops.map((stop) => ({
+                ...stop,
+            })),
             resolution: { ...store.resolution },
             resolutionLocked: store.resolutionLocked,
             aspectMode: store.aspectMode,
@@ -96,7 +98,9 @@
         store.activeColormapId = snap.activeColormapId;
         store.customColorHex = snap.customColorHex;
         store.customSeedSourceId = snap.customSeedSourceId;
-        store.customGradientStops = [...snap.customGradientStops];
+        store.customGradientStops = snap.customGradientStops.map((stop) => ({
+            ...stop,
+        }));
         store.resolution = { ...snap.resolution };
         store.resolutionLocked = snap.resolutionLocked;
         store.aspectMode = snap.aspectMode;
