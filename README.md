@@ -1,10 +1,8 @@
 # Nabla Type
 
-> Experimental typography grown from reaction-diffusion.
-
 ![Demo](docs/demo.gif)
 
-Nabla Type turns glyph masks into living, organic letterforms. Seed a Gray-Scott simulation, let it evolve in real time on the GPU, and export the result as SVG or PNG.
+Nabla Type turns glyph masks into living, organic letterforms. 
 
 **Live demo:** [nablatype.ayko.ooo](https://nablatype.ayko.ooo/)
 
@@ -12,7 +10,7 @@ Nabla Type turns glyph masks into living, organic letterforms. Seed a Gray-Scott
 
 This project was created for the [Type Design](https://agdm.fi.muni.cz/en/study/courses/type-design) course at the Faculty of Informatics, Masaryk University.
 
-Traditional type design relies on manual Bézier curve manipulation. Nabla Type explores how algorithmic processes — specifically reaction-diffusion systems — can generate organic, evolving letterforms that would be nearly impossible to draw by hand.
+Traditional type design relies on manual Bézier curve manipulation. Nabla Type explores how algorithmic processes, specifically reaction-diffusion systems, can generate organic, evolving letterforms that would be nearly impossible to draw by hand.
 
 **Why "Nabla"?** The name comes from the **∇** (nabla) operator used in the reaction-diffusion equations. The **∇²** Laplacian determines how the two chemicals diffuse through the medium, making it the mathematical heart of the pattern formation.
 
